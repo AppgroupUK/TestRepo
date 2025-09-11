@@ -6,7 +6,157 @@ class VenueMapApp {
         this.markers = [];
         this.selectedVenue = null;
         
+        // Color palette for counties (will be generated after venues are loaded)
+        this.countyColors = {};
+        
         this.init();
+    }
+
+    generateCountyColorMap() {
+        // Generate a color map for counties using a diverse color palette
+        const colors = [
+            '#e74c3c', '#3498db', '#2ecc71', '#f39c12', '#9b59b6', '#1abc9c',
+            '#e67e22', '#34495e', '#16a085', '#27ae60', '#2980b9', '#8e44ad',
+            '#f1c40f', '#e74c3c', '#95a5a6', '#d35400', '#c0392b', '#7f8c8d',
+            '#2c3e50', '#f39c12', '#e67e22', '#d35400', '#c0392b', '#8e44ad',
+            '#9b59b6', '#3498db', '#2980b9', '#1abc9c', '#16a085', '#27ae60',
+            '#2ecc71', '#f1c40f', '#e74c3c', '#e67e22', '#d35400', '#c0392b',
+            '#8e44ad', '#9b59b6', '#3498db', '#2980b9', '#1abc9c', '#16a085',
+            '#27ae60', '#2ecc71', '#f1c40f', '#e74c3c', '#e67e22', '#d35400',
+            '#c0392b', '#8e44ad', '#9b59b6', '#3498db', '#2980b9', '#1abc9c',
+            '#16a085', '#27ae60', '#2ecc71', '#f1c40f', '#e74c3c', '#e67e22'
+        ];
+        
+        const countyColorMap = {};
+        const counties = [...new Set(this.venues.map(v => v.county))].sort();
+        
+        counties.forEach((county, index) => {
+            countyColorMap[county] = colors[index % colors.length];
+        });
+        
+        return countyColorMap;
+    }
+
+    createCountyLegend() {
+        const legendContent = document.getElementById('legendContent');
+        if (!legendContent) return;
+
+        // Get counties sorted by venue count (most venues first)
+        const countyCounts = {};
+        this.venues.forEach(venue => {
+            countyCounts[venue.county] = (countyCounts[venue.county] || 0) + 1;
+        });
+
+        const sortedCounties = Object.keys(countyCounts)
+            .sort((a, b) => countyCounts[b] - countyCounts[a])
+            .slice(0, 20); // Show top 20 counties
+
+        const legendItems = sortedCounties.map(county => {
+            const color = this.countyColors[county] || '#666666';
+            const count = countyCounts[county];
+            return `
+                <div class="legend-item" onclick="app.filterByCounty('${county}')">
+                    <span class="legend-color" style="background-color: ${color}"></span>
+                    <span class="legend-text">${county} (${count})</span>
+                </div>
+            `;
+        }).join('');
+
+        legendContent.innerHTML = legendItems;
+    }
+
+    filterByCounty(county) {
+        const countyFilter = document.getElementById('countyFilter');
+        countyFilter.value = county;
+        this.applyFilters();
+        // Add a small delay to ensure markers are updated before zooming
+        setTimeout(() => {
+            this.zoomToCounty(county);
+        }, 100);
+    }
+
+    getCountyBounds(county) {
+        // Get all venues in the specified county that have coordinates
+        const countyVenues = this.venues.filter(venue => 
+            venue.county === county && venue.coordinates
+        );
+
+        if (countyVenues.length === 0) {
+            return null;
+        }
+
+        // Calculate bounding box
+        let minLat = countyVenues[0].coordinates[0];
+        let maxLat = countyVenues[0].coordinates[0];
+        let minLng = countyVenues[0].coordinates[1];
+        let maxLng = countyVenues[0].coordinates[1];
+
+        countyVenues.forEach(venue => {
+            const [lat, lng] = venue.coordinates;
+            minLat = Math.min(minLat, lat);
+            maxLat = Math.max(maxLat, lat);
+            minLng = Math.min(minLng, lng);
+            maxLng = Math.max(maxLng, lng);
+        });
+
+        // Add some padding around the bounds
+        const latPadding = (maxLat - minLat) * 0.1;
+        const lngPadding = (maxLng - minLng) * 0.1;
+
+        return [
+            [minLat - latPadding, minLng - lngPadding], // Southwest corner
+            [maxLat + latPadding, maxLng + lngPadding]   // Northeast corner
+        ];
+    }
+
+    zoomToCounty(county) {
+        if (!county) {
+            // If no county selected, fit to all visible markers
+            this.zoomToAllVenues();
+            return;
+        }
+
+        const bounds = this.getCountyBounds(county);
+        if (bounds) {
+            // Smooth zoom to the county bounds
+            this.map.fitBounds(bounds, {
+                padding: [20, 20], // Add padding around the bounds
+                maxZoom: 12 // Don't zoom in too close
+            });
+        }
+    }
+
+    zoomToAllVenues() {
+        // Get all venues with coordinates
+        const venuesWithCoords = this.venues.filter(venue => venue.coordinates);
+        
+        if (venuesWithCoords.length === 0) {
+            return;
+        }
+
+        // Calculate bounds for all venues
+        let minLat = venuesWithCoords[0].coordinates[0];
+        let maxLat = venuesWithCoords[0].coordinates[0];
+        let minLng = venuesWithCoords[0].coordinates[1];
+        let maxLng = venuesWithCoords[0].coordinates[1];
+
+        venuesWithCoords.forEach(venue => {
+            const [lat, lng] = venue.coordinates;
+            minLat = Math.min(minLat, lat);
+            maxLat = Math.max(maxLat, lat);
+            minLng = Math.min(minLng, lng);
+            maxLng = Math.max(maxLng, lng);
+        });
+
+        const bounds = [
+            [minLat, minLng],
+            [maxLat, maxLng]
+        ];
+
+        this.map.fitBounds(bounds, {
+            padding: [20, 20],
+            maxZoom: 6 // Don't zoom in too close when showing all
+        });
     }
 
     init() {
@@ -51,6 +201,13 @@ class VenueMapApp {
             });
 
             this.filteredVenues = [...this.venues];
+            
+            // Generate county color map after venues are loaded
+            this.countyColors = this.generateCountyColorMap();
+            
+            // Create county legend
+            this.createCountyLegend();
+            
             console.log(`Successfully loaded ${this.venues.length} venues from embedded data`);
         } catch (error) {
             console.error('Error loading venue data:', error);
@@ -165,7 +322,33 @@ class VenueMapApp {
     addMarkerToMap(venue) {
         if (!venue.coordinates) return;
 
-        const marker = L.marker(venue.coordinates).addTo(this.map);
+        // Get county color
+        const countyColor = this.countyColors[venue.county] || '#666666';
+        
+        // Create custom colored marker
+        const marker = L.circleMarker(venue.coordinates, {
+            radius: 8,
+            fillColor: countyColor,
+            color: '#fff',
+            weight: 2,
+            opacity: 1,
+            fillOpacity: 0.8
+        }).addTo(this.map);
+
+        // Add hover effects
+        marker.on('mouseover', function() {
+            this.setStyle({
+                radius: 10,
+                weight: 3
+            });
+        });
+
+        marker.on('mouseout', function() {
+            this.setStyle({
+                radius: 8,
+                weight: 2
+            });
+        });
         
         // Create popup content
         const popupContent = `
@@ -173,6 +356,7 @@ class VenueMapApp {
             <div class="popup-address">${venue.fullAddress}</div>
             <div class="popup-details">
                 <strong>Type:</strong> ${venue.type}<br>
+                ${venue.county ? `<strong>County:</strong> ${venue.county}<br>` : ''}
                 ${venue.accountManager ? `<strong>Account Manager:</strong> ${venue.accountManager}<br>` : ''}
                 ${venue.phone ? `<strong>Phone:</strong> ${venue.phone}<br>` : ''}
             </div>
@@ -228,6 +412,7 @@ class VenueMapApp {
                 <div class="venue-address">${venue.fullAddress}</div>
                 <div class="venue-details">
                     <span class="venue-tag ${venue.type.toLowerCase()}">${venue.type}</span>
+                    ${venue.county ? `<span class="venue-tag county">${venue.county}</span>` : ''}
                     ${venue.phone ? `<span class="venue-tag">${venue.phone}</span>` : ''}
                 </div>
             </div>
@@ -276,20 +461,32 @@ class VenueMapApp {
             this.applyFilters();
         });
 
-        document.getElementById('countryFilter').addEventListener('change', () => {
+        document.getElementById('countyFilter').addEventListener('change', (e) => {
+            const selectedCounty = e.target.value;
             this.applyFilters();
+            // Add a small delay to ensure markers are updated before zooming
+            setTimeout(() => {
+                this.zoomToCounty(selectedCounty);
+            }, 100);
         });
     }
 
     populateFilters() {
-        const countryFilter = document.getElementById('countryFilter');
-        const countries = [...new Set(this.venues.map(v => v.country))].sort();
+        const countyFilter = document.getElementById('countyFilter');
         
-        countries.forEach(country => {
+        // Populate county filter with venue counts
+        const countyCounts = {};
+        this.venues.forEach(venue => {
+            countyCounts[venue.county] = (countyCounts[venue.county] || 0) + 1;
+        });
+        
+        const counties = [...new Set(this.venues.map(v => v.county))].sort();
+        counties.forEach(county => {
             const option = document.createElement('option');
-            option.value = country;
-            option.textContent = country;
-            countryFilter.appendChild(option);
+            option.value = county;
+            const count = countyCounts[county];
+            option.textContent = `${county} - ${count} venue${count !== 1 ? 's' : ''}`;
+            countyFilter.appendChild(option);
         });
     }
 
@@ -306,7 +503,7 @@ class VenueMapApp {
 
     applyFilters() {
         const typeFilter = document.getElementById('typeFilter').value;
-        const countryFilter = document.getElementById('countryFilter').value;
+        const countyFilter = document.getElementById('countyFilter').value;
         
         let filtered = [...this.venues];
         
@@ -317,6 +514,7 @@ class VenueMapApp {
                 venue.name.toLowerCase().includes(searchQuery) ||
                 venue.fullAddress.toLowerCase().includes(searchQuery) ||
                 venue.town.toLowerCase().includes(searchQuery) ||
+                venue.county.toLowerCase().includes(searchQuery) ||
                 venue.accountManager.toLowerCase().includes(searchQuery)
             );
         }
@@ -326,9 +524,9 @@ class VenueMapApp {
             filtered = filtered.filter(venue => venue.type === typeFilter);
         }
         
-        // Apply country filter
-        if (countryFilter) {
-            filtered = filtered.filter(venue => venue.country === countryFilter);
+        // Apply county filter
+        if (countyFilter) {
+            filtered = filtered.filter(venue => venue.county === countyFilter);
         }
         
         this.filteredVenues = filtered;

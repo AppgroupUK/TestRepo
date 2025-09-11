@@ -201,6 +201,56 @@ main {
     background: #27ae60;
 }
 
+.venue-tag.county {
+    background: #8e44ad;
+    font-size: 0.75rem;
+}
+
+/* County Legend Styles */
+.county-legend {
+    margin-top: 2rem;
+    padding: 1rem;
+    background: rgba(255, 255, 255, 0.9);
+    border-radius: 8px;
+    max-height: 300px;
+    overflow-y: auto;
+}
+
+.county-legend h4 {
+    margin-bottom: 1rem;
+    color: #2c3e50;
+    font-size: 1.1rem;
+    font-weight: 600;
+}
+
+.legend-item {
+    display: flex;
+    align-items: center;
+    padding: 0.5rem 0;
+    cursor: pointer;
+    border-radius: 4px;
+    transition: background-color 0.2s ease;
+}
+
+.legend-item:hover {
+    background-color: rgba(52, 152, 219, 0.1);
+}
+
+.legend-color {
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    margin-right: 0.75rem;
+    border: 2px solid #fff;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+}
+
+.legend-text {
+    font-size: 0.9rem;
+    color: #2c3e50;
+    font-weight: 500;
+}
+
 .loading {
     text-align: center;
     padding: 2rem;
@@ -303,3 +353,4 @@ main {
     font-size: 0.9rem;
     color: #95a5a6;
 }
+

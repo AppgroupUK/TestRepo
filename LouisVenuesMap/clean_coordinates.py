@@ -120,3 +120,4 @@ if __name__ == "__main__":
     else:
         print("⚠️  Error regenerating venue data:")
         print(result.stderr)
+

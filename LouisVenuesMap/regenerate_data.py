@@ -36,6 +36,7 @@ def regenerate_venue_data():
                 'address2': row.get('Address2', '').strip(),
                 'town': row.get('Town', '').strip(),
                 'postCode': row.get('PostCode', '').strip(),
+                'county': row.get('County', '').strip() or 'Unknown',
                 'country': row.get('Country', '').strip() or 'UK',
                 'type': row.get('Type', '').strip() or 'Unknown',
                 'accountManager': row.get('Account Manager Name', '').strip(),
@@ -89,3 +90,4 @@ const VENUE_DATA = {json.dumps(venues, indent=2)};
 
 if __name__ == "__main__":
     regenerate_venue_data()
+
