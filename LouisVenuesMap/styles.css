@@ -251,6 +251,32 @@ main {
     font-weight: 500;
 }
 
+/* Boundary Toggle Button */
+.boundary-toggle {
+    background: #3498db;
+    color: white;
+    border: none;
+    padding: 0.5rem 1rem;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 0.9rem;
+    font-weight: 600;
+    margin-left: 1rem;
+    transition: background-color 0.2s ease;
+}
+
+.boundary-toggle:hover {
+    background: #2980b9;
+}
+
+.boundary-toggle.active {
+    background: #e74c3c;
+}
+
+.boundary-toggle.active:hover {
+    background: #c0392b;
+}
+
 .loading {
     text-align: center;
     padding: 2rem;
