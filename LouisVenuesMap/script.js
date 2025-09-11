@@ -173,8 +173,8 @@ class VenueMapApp {
             <div class="popup-address">${venue.fullAddress}</div>
             <div class="popup-details">
                 <strong>Type:</strong> ${venue.type}<br>
-                ${venue.phone ? `<strong>Phone:</strong> ${venue.phone}<br>` : ''}
                 ${venue.accountManager ? `<strong>Account Manager:</strong> ${venue.accountManager}<br>` : ''}
+                ${venue.phone ? `<strong>Phone:</strong> ${venue.phone}<br>` : ''}
             </div>
         `;
         
