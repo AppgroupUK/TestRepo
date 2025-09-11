@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>JW & Smirnoff Venues Map</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>JW & Smirnoff Venues Map</h1>
+            <div class="controls">
+                <div class="search-container">
+                    <input type="text" id="searchInput" placeholder="Search venues..." />
+                    <button id="searchBtn">Search</button>
+                </div>
+                <div class="filter-container">
+                    <select id="typeFilter">
+                        <option value="">All Types</option>
+                        <option value="JW">JW</option>
+                        <option value="Smirnoff">Smirnoff</option>
+                    </select>
+                    <select id="countryFilter">
+                        <option value="">All Countries</option>
+                    </select>
+                </div>
+                <div class="stats">
+                    <span id="venueCount">Loading venues...</span>
+                </div>
+            </div>
+        </header>
+        
+        <main>
+            <div id="map"></div>
+            <div class="sidebar">
+                <h3>Venue Details</h3>
+                <div id="venueList" class="venue-list">
+                    <p>Click on a marker to view venue details</p>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="venue-data.js"></script>
+    <script src="script.js"></script>
+</body>
+</html>
