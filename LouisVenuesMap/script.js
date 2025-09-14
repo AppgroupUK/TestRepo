@@ -11,6 +11,20 @@ class VenueMapApp {
         // Color palette for counties (will be generated after venues are loaded)
         this.countyColors = {};
         
+        // County groups for filtering
+        this.countyGroups = {
+            "North West": ["Greater Manchester", "Lancashire", "Cheshire", "Merseyside"],
+            "North East": ["Tyne and Wear", "County Durham", "Cleveland", "North Yorkshire", "Cumbria"],
+            "Yorkshire & Humber": ["South Yorkshire", "West Yorkshire", "North Yorkshire", "East Yorkshire"],
+            "West Midlands": ["West Midlands", "Staffordshire", "Worcestershire", "Warwickshire", "Shropshire"],
+            "East Midlands": ["Nottinghamshire", "Derbyshire", "Leicestershire", "Northamptonshire", "Lincolnshire"],
+            "London & South East": ["Greater London", "Kent", "Surrey", "Hertfordshire", "Essex", "Buckinghamshire", "Berkshire", "Oxfordshire"],
+            "South West": ["Devon", "Cornwall", "Dorset", "Somerset", "Wiltshire", "Gloucestershire", "Bristol"],
+            "East of England": ["Norfolk", "Suffolk", "Cambridgeshire", "Hampshire"],
+            "Scotland": ["Edinburgh", "Glasgow", "Aberdeenshire", "Fife", "Renfrewshire", "Dundee", "North Lanarkshire", "Falkirk", "Perth and Kinross", "East Ayrshire"],
+            "Wales": ["Cardiff", "Clwyd", "West Glamorgan", "Gwent"]
+        };
+        
         this.init();
     }
 
@@ -278,7 +292,60 @@ class VenueMapApp {
                 padding: [20, 20], // Add padding around the bounds
                 maxZoom: 12 // Don't zoom in too close
             });
+            // Update slider after zoom
+            setTimeout(() => this.updateZoomSlider(), 300);
         }
+    }
+
+    zoomToCountyGroup(groupName) {
+        if (!groupName) {
+            // If no group selected, fit to all visible markers
+            this.zoomToAllVenues();
+            return;
+        }
+
+        const countiesInGroup = this.countyGroups[groupName];
+        if (!countiesInGroup) return;
+
+        // Get all venues in the specified county group that have coordinates
+        const groupVenues = this.filteredVenues.filter(venue => 
+            countiesInGroup.includes(venue.county) && venue.coordinates
+        );
+
+        if (groupVenues.length === 0) {
+            return;
+        }
+
+        // Calculate bounding box for all venues in the group
+        let minLat = groupVenues[0].coordinates[0];
+        let maxLat = groupVenues[0].coordinates[0];
+        let minLng = groupVenues[0].coordinates[1];
+        let maxLng = groupVenues[0].coordinates[1];
+
+        groupVenues.forEach(venue => {
+            const [lat, lng] = venue.coordinates;
+            minLat = Math.min(minLat, lat);
+            maxLat = Math.max(maxLat, lat);
+            minLng = Math.min(minLng, lng);
+            maxLng = Math.max(maxLng, lng);
+        });
+
+        // Add some padding around the bounds
+        const latPadding = (maxLat - minLat) * 0.1;
+        const lngPadding = (maxLng - minLng) * 0.1;
+
+        const bounds = [
+            [minLat - latPadding, minLng - lngPadding], // Southwest corner
+            [maxLat + latPadding, maxLng + lngPadding]   // Northeast corner
+        ];
+
+        // Smooth zoom to the group bounds
+        this.map.fitBounds(bounds, {
+            padding: [20, 20], // Add padding around the bounds
+            maxZoom: 12 // Don't zoom in too close
+        });
+        // Update slider after zoom
+        setTimeout(() => this.updateZoomSlider(), 300);
     }
 
     zoomToAllVenues() {
@@ -312,15 +379,18 @@ class VenueMapApp {
             padding: [20, 20],
             maxZoom: 6 // Don't zoom in too close when showing all
         });
+        // Update slider after zoom
+        setTimeout(() => this.updateZoomSlider(), 300);
     }
 
     init() {
         try {
             this.loadVenues();
-            this.initializeMap();
-            this.setupEventListeners();
-            this.populateFilters();
-            this.updateVenueCount();
+        this.initializeMap();
+        this.setupEventListeners();
+        this.populateFilters();
+        this.updateVenueCount();
+        this.updateSidebarTitle();
         } catch (error) {
             console.error('Error initializing app:', error);
             this.showError('Failed to load venues. Please check the venue data.');
@@ -387,8 +457,20 @@ class VenueMapApp {
     }
 
     initializeMap() {
-        // Initialize map centered on UK
-        this.map = L.map('map').setView([54.5, -3.5], 6);
+        // Initialize map centered on UK with finer zoom control
+        this.map = L.map('map', {
+            zoomControl: true,
+            scrollWheelZoom: true,
+            doubleClickZoom: true,
+            boxZoom: true,
+            keyboard: true,
+            dragging: true,
+            zoomSnap: 0.1,  // Allow zoom levels in 0.1 increments
+            zoomDelta: 0.5, // Smaller zoom steps when using +/- buttons
+            wheelPxPerZoomLevel: 60, // More sensitive mouse wheel zoom
+            maxZoom: 19,
+            minZoom: 3
+        }).setView([54.5, -3.5], 6);
 
         // Add OpenStreetMap tiles
         L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
@@ -398,6 +480,9 @@ class VenueMapApp {
 
         // Add venues to map
         this.addVenuesToMap();
+
+        // Initialize zoom slider with current zoom level
+        this.updateZoomSlider();
     }
 
     async addVenuesToMap() {
@@ -556,25 +641,66 @@ class VenueMapApp {
 
     updateVenueList() {
         const venueList = document.getElementById('venueList');
+        const countyGroupFilter = document.getElementById('countyGroupFilter');
+        const isCountyGroupSelected = countyGroupFilter && countyGroupFilter.value !== '';
         
         if (this.filteredVenues.length === 0) {
             venueList.innerHTML = '<p class="loading">No venues found matching your criteria.</p>';
             return;
         }
 
-        const venueItems = this.filteredVenues.map(venue => `
-            <div class="venue-item ${venue === this.selectedVenue ? 'selected' : ''}" 
-                 data-venue-id="${venue.id}" 
-                 onclick="app.selectVenueFromList(${venue.id})">
-                <div class="venue-name">${venue.name}</div>
-                <div class="venue-address">${venue.fullAddress}</div>
-                <div class="venue-details">
-                    <span class="venue-tag ${venue.type.toLowerCase()}">${venue.type}</span>
-                    ${venue.county ? `<span class="venue-tag county">${venue.county}</span>` : ''}
-                    ${venue.phone ? `<span class="venue-tag">${venue.phone}</span>` : ''}
+        let venueItems;
+        
+        if (isCountyGroupSelected) {
+            // Group venues by county within the selected county group
+            const venuesByCounty = {};
+            this.filteredVenues.forEach(venue => {
+                if (!venuesByCounty[venue.county]) {
+                    venuesByCounty[venue.county] = [];
+                }
+                venuesByCounty[venue.county].push(venue);
+            });
+
+            // Sort counties alphabetically
+            const sortedCounties = Object.keys(venuesByCounty).sort();
+            
+            venueItems = sortedCounties.map(county => {
+                const countyVenues = venuesByCounty[county];
+                const countySection = `
+                    <div class="county-section">
+                        <div class="county-section-header">
+                            <h4>${county}</h4>
+                            <span class="county-venue-count">${countyVenues.length} venue${countyVenues.length !== 1 ? 's' : ''}</span>
+                        </div>
+                        <div class="county-venues">
+                            ${countyVenues.map(venue => `
+                                <div class="venue-item-simple ${venue === this.selectedVenue ? 'selected' : ''}" 
+                                     data-venue-id="${venue.id}" 
+                                     onclick="app.selectVenueFromList(${venue.id})">
+                                    <div class="venue-name-simple">${venue.name}</div>
+                                </div>
+                            `).join('')}
+                        </div>
+                    </div>
+                `;
+                return countySection;
+            }).join('');
+        } else {
+            // Show full details when no county group is selected
+            venueItems = this.filteredVenues.map(venue => `
+                <div class="venue-item ${venue === this.selectedVenue ? 'selected' : ''}" 
+                     data-venue-id="${venue.id}" 
+                     onclick="app.selectVenueFromList(${venue.id})">
+                    <div class="venue-name">${venue.name}</div>
+                    <div class="venue-address">${venue.fullAddress}</div>
+                    <div class="venue-details">
+                        <span class="venue-tag ${venue.type.toLowerCase()}">${venue.type}</span>
+                        ${venue.county ? `<span class="venue-tag county">${venue.county}</span>` : ''}
+                        ${venue.phone ? `<span class="venue-tag">${venue.phone}</span>` : ''}
+                    </div>
                 </div>
-            </div>
-        `).join('');
+            `).join('');
+        }
 
         venueList.innerHTML = venueItems;
     }
@@ -587,6 +713,8 @@ class VenueMapApp {
             // Center map on venue if it has coordinates
             if (venue.coordinates) {
                 this.map.setView(venue.coordinates, 15);
+                // Update slider after zoom
+                setTimeout(() => this.updateZoomSlider(), 100);
                 
                 // Find and open the marker popup
                 const markerData = this.markers.find(m => m.venue.id === venueId);
@@ -594,6 +722,9 @@ class VenueMapApp {
                     markerData.marker.openPopup();
                 }
             }
+            
+            // Show detailed venue information in a popup/modal
+            this.showVenueDetails(venue);
         }
     }
 
@@ -628,14 +759,34 @@ class VenueMapApp {
             }, 100);
         });
 
-        // Boundary toggle functionality
-        document.getElementById('toggleBoundaries').addEventListener('click', () => {
-            this.toggleCountyBoundaries();
+        document.getElementById('countyGroupFilter').addEventListener('change', (e) => {
+            const selectedGroup = e.target.value;
+            this.applyFilters();
+            // Add a small delay to ensure markers are updated before zooming
+            setTimeout(() => {
+                this.zoomToCountyGroup(selectedGroup);
+            }, 100);
+        });
+
+        // Zoom slider functionality
+        const zoomSlider = document.getElementById('zoomSlider');
+        zoomSlider.addEventListener('input', (e) => {
+            const sliderValue = parseFloat(e.target.value);
+            const zoomLevel = this.sliderToZoomLevel(sliderValue);
+            this.map.setZoom(zoomLevel);
+        });
+
+        // Sync slider with map zoom changes
+        this.map.on('zoomend', () => {
+            const currentZoom = this.map.getZoom();
+            const sliderValue = this.zoomLevelToSlider(currentZoom);
+            zoomSlider.value = sliderValue;
         });
     }
 
     populateFilters() {
         const countyFilter = document.getElementById('countyFilter');
+        const countyGroupFilter = document.getElementById('countyGroupFilter');
         
         // Populate county filter with venue counts
         const countyCounts = {};
@@ -650,6 +801,21 @@ class VenueMapApp {
             const count = countyCounts[county];
             option.textContent = `${county} - ${count} venue${count !== 1 ? 's' : ''}`;
             countyFilter.appendChild(option);
+        });
+
+        // Populate county group filter with venue counts
+        Object.keys(this.countyGroups).forEach(groupName => {
+            const countiesInGroup = this.countyGroups[groupName];
+            const groupCount = this.venues.filter(venue => 
+                countiesInGroup.includes(venue.county)
+            ).length;
+            
+            if (groupCount > 0) {
+                const option = document.createElement('option');
+                option.value = groupName;
+                option.textContent = `${groupName} - ${groupCount} venue${groupCount !== 1 ? 's' : ''}`;
+                countyGroupFilter.appendChild(option);
+            }
         });
     }
 
@@ -668,6 +834,7 @@ class VenueMapApp {
     applyFilters() {
         const typeFilter = document.getElementById('typeFilter').value;
         const countyFilter = document.getElementById('countyFilter').value;
+        const countyGroupFilter = document.getElementById('countyGroupFilter').value;
         
         let filtered = [...this.venues];
         
@@ -693,10 +860,19 @@ class VenueMapApp {
             filtered = filtered.filter(venue => venue.county === countyFilter);
         }
         
+        // Apply county group filter
+        if (countyGroupFilter) {
+            const countiesInGroup = this.countyGroups[countyGroupFilter];
+            if (countiesInGroup) {
+                filtered = filtered.filter(venue => countiesInGroup.includes(venue.county));
+            }
+        }
+        
         this.filteredVenues = filtered;
         this.updateMap();
         this.updateVenueList();
         this.updateVenueCount();
+        this.updateSidebarTitle();
     }
 
     updateMap() {
@@ -717,6 +893,8 @@ class VenueMapApp {
         if (this.markers.length > 0) {
             const group = new L.featureGroup(this.markers.map(m => m.marker));
             this.map.fitBounds(group.getBounds().pad(0.1));
+            // Update slider after zoom
+            setTimeout(() => this.updateZoomSlider(), 300);
         }
     }
 
@@ -725,6 +903,125 @@ class VenueMapApp {
         const total = this.venues.length;
         document.getElementById('venueCount').textContent = 
             count === total ? `${total} venues` : `${count} of ${total} venues`;
+    }
+
+    updateSidebarTitle() {
+        const sidebarTitle = document.querySelector('.sidebar h3');
+        const countyGroupFilter = document.getElementById('countyGroupFilter');
+        const countyFilter = document.getElementById('countyFilter');
+        
+        if (countyGroupFilter && countyGroupFilter.value !== '') {
+            // Show county group name
+            sidebarTitle.textContent = countyGroupFilter.value;
+        } else if (countyFilter && countyFilter.value !== '') {
+            // Show county name
+            sidebarTitle.textContent = countyFilter.value;
+        } else {
+            // Default title
+            sidebarTitle.textContent = 'Venue Details';
+        }
+    }
+
+    sliderToZoomLevel(sliderValue) {
+        // Map slider value (0-24) to zoom level (6-12)
+        // Max zoom (12) is reached at about 2/3rds of slider range (position 16)
+        const minZoom = 6;
+        const maxZoom = 12;
+        const sliderMin = 0;
+        const sliderMax = 24;
+        const maxZoomPosition = 16; // 2/3rds of 24
+        
+        if (sliderValue <= maxZoomPosition) {
+            // Linear mapping from 0-16 to 6-12
+            return minZoom + (sliderValue / maxZoomPosition) * (maxZoom - minZoom);
+        } else {
+            // Beyond 2/3rds, stay at max zoom
+            return maxZoom;
+        }
+    }
+
+    zoomLevelToSlider(zoomLevel) {
+        // Map zoom level (6-12) to slider value (0-24)
+        const minZoom = 6;
+        const maxZoom = 12;
+        const sliderMin = 0;
+        const sliderMax = 24;
+        const maxZoomPosition = 16; // 2/3rds of 24
+        
+        if (zoomLevel <= maxZoom) {
+            // Linear mapping from 6-12 to 0-16
+            return (zoomLevel - minZoom) / (maxZoom - minZoom) * maxZoomPosition;
+        } else {
+            // Beyond max zoom, stay at max position
+            return maxZoomPosition;
+        }
+    }
+
+    updateZoomSlider() {
+        const zoomSlider = document.getElementById('zoomSlider');
+        if (zoomSlider && this.map) {
+            const currentZoom = this.map.getZoom();
+            const sliderValue = this.zoomLevelToSlider(currentZoom);
+            zoomSlider.value = sliderValue;
+        }
+    }
+
+    showVenueDetails(venue) {
+        // Create a detailed venue card that appears in the venue list area
+        const venueList = document.getElementById('venueList');
+        
+        const venueDetailsHTML = `
+            <div class="venue-details-card">
+                <div class="venue-details-header">
+                    <h4>${venue.name}</h4>
+                    <button class="close-details" onclick="app.hideVenueDetails()">×</button>
+                </div>
+                <div class="venue-details-content">
+                    <div class="detail-row">
+                        <strong>Address:</strong> ${venue.fullAddress}
+                    </div>
+                    <div class="detail-row">
+                        <strong>Type:</strong> 
+                        <span class="venue-tag ${venue.type.toLowerCase()}">${venue.type}</span>
+                    </div>
+                    ${venue.county ? `
+                    <div class="detail-row">
+                        <strong>County:</strong> 
+                        <span class="venue-tag county">${venue.county}</span>
+                    </div>
+                    ` : ''}
+                    ${venue.accountManager ? `
+                    <div class="detail-row">
+                        <strong>Account Manager:</strong> ${venue.accountManager}
+                    </div>
+                    ` : ''}
+                    ${venue.phone ? `
+                    <div class="detail-row">
+                        <strong>Phone:</strong> ${venue.phone}
+                    </div>
+                    ` : ''}
+                    ${venue.accountManagerEmail ? `
+                    <div class="detail-row">
+                        <strong>Email:</strong> 
+                        <a href="mailto:${venue.accountManagerEmail}">${venue.accountManagerEmail}</a>
+                    </div>
+                    ` : ''}
+                </div>
+            </div>
+        `;
+        
+        venueList.innerHTML = venueDetailsHTML;
+        
+        // Update sidebar title to show venue name
+        const sidebarTitle = document.querySelector('.sidebar h3');
+        sidebarTitle.textContent = venue.name;
+    }
+
+    hideVenueDetails() {
+        // Refresh the venue list to show the normal list again
+        this.updateVenueList();
+        // Restore the appropriate title based on current filters
+        this.updateSidebarTitle();
     }
 
     showError(message) {
