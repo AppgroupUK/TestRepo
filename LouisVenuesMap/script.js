@@ -14,6 +14,7 @@ class VenueMapApp {
         // Circle management
         this.circles = [];
         this.selectedCircle = null;
+        this.highlightedCircle = null;
         this.circleCounter = 0;
         this.circleModeEnabled = false;
         
@@ -648,6 +649,11 @@ class VenueMapApp {
             this.importCirclesFromFile(e);
         });
 
+        // Circle dropdown selection
+        document.getElementById('circleDropdown').addEventListener('change', (e) => {
+            this.selectCircleFromDropdown(e.target.value);
+        });
+
         // Circle mode toggle
         document.getElementById('circleModeSwitch').addEventListener('change', (e) => {
             this.toggleCircleMode(e.target.checked);
@@ -905,7 +911,8 @@ class VenueMapApp {
             id: ++this.circleCounter,
             circle: circle,
             center: latlng,
-            radius: radius
+            radius: radius,
+            venues: [] // Track venues within this circle
         };
         
         this.circles.push(circleData);
@@ -913,11 +920,15 @@ class VenueMapApp {
         // Add event listeners for selection and dragging
         this.addCircleEventListeners(circleData);
         
+        // Update venues within this circle
+        this.updateVenuesInCircle(circleData);
+        
         // Update UI
         this.updateCircleControls();
         this.showClearButton();
         this.showCircleControls();
         this.updatePersistenceButtons();
+        this.updateCircleDropdown();
         
         // Auto-save to localStorage
         this.saveToLocalStorage();
@@ -968,6 +979,9 @@ class VenueMapApp {
                 circle.setStyle({ cursor: 'pointer' });
                 this.map.dragging.enable();
                 
+                // Update venues within the circle after dragging
+                this.updateVenuesInCircle(circleData);
+                
                 // Auto-save to localStorage after dragging
                 this.saveToLocalStorage();
             }
@@ -976,6 +990,9 @@ class VenueMapApp {
 
     selectCircle(circleData) {
         if (!this.circleModeEnabled) return;
+        
+        // Clear any dropdown highlights
+        this.clearCircleHighlights();
         
         // Deselect previous circle
         this.deselectCircle();
@@ -1004,6 +1021,7 @@ class VenueMapApp {
             });
             this.selectedCircle = null;
         }
+        this.clearCircleHighlights();
         this.updateCircleControls();
     }
 
@@ -1013,8 +1031,53 @@ class VenueMapApp {
             this.selectedCircle.circle.setRadius(radius);
             document.getElementById('radiusValue').textContent = `${radius.toLocaleString()}m`;
             
+            // Update venues within the circle
+            this.updateVenuesInCircle(this.selectedCircle);
+            
             // Auto-save to localStorage
             this.saveToLocalStorage();
+        }
+    }
+
+    updateVenuesInCircle(circleData) {
+        if (!circleData || !circleData.circle) return;
+        
+        // Clear existing venues
+        circleData.venues = [];
+        
+        // Get circle center and radius
+        const circleCenter = circleData.circle.getLatLng();
+        const radius = circleData.circle.getRadius();
+        
+        // Check each venue
+        this.venues.forEach(venue => {
+            if (!venue.coordinates) return;
+            
+            const [venueLat, venueLng] = venue.coordinates;
+            const venuePoint = L.latLng(venueLat, venueLng);
+            
+            // Calculate distance from circle center to venue
+            const distance = circleCenter.distanceTo(venuePoint);
+            
+            // If venue is within circle radius, add it to the circle's venues
+            if (distance <= radius) {
+                circleData.venues.push({
+                    id: venue.id,
+                    name: venue.name,
+                    address: venue.address,
+                    county: venue.county,
+                    coordinates: venue.coordinates,
+                    distance: Math.round(distance) // Distance in meters
+                });
+            }
+        });
+        
+        // Sort venues by distance (closest first)
+        circleData.venues.sort((a, b) => a.distance - b.distance);
+        
+        // Update circle info display if this is the selected circle
+        if (this.selectedCircle && this.selectedCircle.id === circleData.id) {
+            this.updateCircleInfo();
         }
     }
 
@@ -1030,12 +1093,41 @@ class VenueMapApp {
         const deleteButton = document.getElementById('deleteSelectedCircle');
         
         if (this.selectedCircle) {
-            circleInfo.textContent = `Circle ${this.selectedCircle.id} - Radius: ${this.selectedCircle.radius.toLocaleString()}m`;
+            const venueCount = this.selectedCircle.venues ? this.selectedCircle.venues.length : 0;
+            circleInfo.innerHTML = `
+                <div class="circle-basic-info">
+                    <strong>Circle ${this.selectedCircle.id}</strong><br>
+                    Radius: ${this.selectedCircle.radius.toLocaleString()}m<br>
+                    Venues: ${venueCount}
+                </div>
+                ${venueCount > 0 ? this.createVenueListHTML(this.selectedCircle.venues) : ''}
+            `;
             deleteButton.disabled = false;
         } else {
             circleInfo.textContent = 'No circle selected';
             deleteButton.disabled = true;
         }
+    }
+
+    createVenueListHTML(venues) {
+        if (!venues || venues.length === 0) return '';
+        
+        const venueItems = venues.map(venue => `
+            <div class="venue-in-circle">
+                <div class="venue-name">${venue.name}</div>
+                <div class="venue-address">${venue.address}</div>
+                <div class="venue-distance">${venue.distance.toLocaleString()}m away</div>
+            </div>
+        `).join('');
+        
+        return `
+            <div class="venues-in-circle">
+                <h5>Venues in Circle:</h5>
+                <div class="venue-list">
+                    ${venueItems}
+                </div>
+            </div>
+        `;
     }
 
     deleteSelectedCircle() {
@@ -1051,11 +1143,13 @@ class VenueMapApp {
             
             // Clear selection
             this.selectedCircle = null;
+            this.highlightedCircle = null;
             
             // Update UI
             this.updateCircleControls();
             this.updateClearButtonVisibility();
             this.updatePersistenceButtons();
+            this.updateCircleDropdown();
             
             // Auto-save to localStorage
             this.saveToLocalStorage();
@@ -1071,11 +1165,13 @@ class VenueMapApp {
         // Clear array
         this.circles = [];
         this.selectedCircle = null;
+        this.highlightedCircle = null;
         
         // Update UI
         this.updateCircleControls();
         this.updateClearButtonVisibility();
         this.updatePersistenceButtons();
+        this.updateCircleDropdown();
         this.hideCircleControls();
         
         // Auto-save to localStorage
@@ -1233,10 +1329,14 @@ class VenueMapApp {
                 id: circleInfo.id || ++this.circleCounter,
                 circle: circle,
                 center: latlng,
-                radius: radius
+                radius: radius,
+                venues: [] // Initialize venues array
             };
             
             this.circles.push(circleData);
+            
+            // Update venues within this circle
+            this.updateVenuesInCircle(circleData);
             
             // Add event listeners
             this.addCircleEventListeners(circleData);
@@ -1245,6 +1345,7 @@ class VenueMapApp {
         // Update UI
         this.updateCircleControls();
         this.showClearButton();
+        this.updateCircleDropdown();
         if (this.circleModeEnabled) {
             this.showCircleControls();
             this.enableCircleInteractions();
@@ -1280,6 +1381,9 @@ class VenueMapApp {
             } catch (error) {
                 console.error('Error loading circles from localStorage:', error);
             }
+        } else {
+            // Initialize dropdown even if no circles
+            this.updateCircleDropdown();
         }
     }
 
@@ -1313,6 +1417,105 @@ class VenueMapApp {
     showError(message) {
         const venueList = document.getElementById('venueList');
         venueList.innerHTML = `<div class="error">${message}</div>`;
+    }
+
+    // Circle Dropdown Methods
+    updateCircleDropdown() {
+        const dropdown = document.getElementById('circleDropdown');
+        const circleDetails = document.getElementById('circleDetails');
+        
+        // Clear existing options except the first one
+        dropdown.innerHTML = '<option value="">Select a circle to view details</option>';
+        
+        if (this.circles.length === 0) {
+            circleDetails.style.display = 'none';
+            return;
+        }
+        
+        // Add options for each circle
+        this.circles.forEach(circleData => {
+            const option = document.createElement('option');
+            option.value = circleData.id;
+            option.textContent = `Circle ${circleData.id} - ${circleData.radius.toLocaleString()}m radius`;
+            dropdown.appendChild(option);
+        });
+    }
+
+    selectCircleFromDropdown(circleId) {
+        const circleDetails = document.getElementById('circleDetails');
+        
+        if (!circleId) {
+            circleDetails.style.display = 'none';
+            this.clearCircleHighlights();
+            return;
+        }
+        
+        const circleData = this.circles.find(c => c.id == circleId);
+        if (!circleData) {
+            circleDetails.style.display = 'none';
+            this.clearCircleHighlights();
+            return;
+        }
+        
+        // Show circle details
+        circleDetails.style.display = 'block';
+        this.displayCircleDetails(circleData);
+        
+        // Highlight the circle on the map
+        this.highlightCircleOnMap(circleData);
+    }
+
+    displayCircleDetails(circleData) {
+        const circleInfo = document.getElementById('circleInfo');
+        const venueCount = circleData.venues ? circleData.venues.length : 0;
+        
+        circleInfo.innerHTML = `
+            <div class="circle-basic-info">
+                <strong>Circle ${circleData.id}</strong><br>
+                Radius: ${circleData.radius.toLocaleString()}m<br>
+                Center: ${circleData.center.lat.toFixed(6)}, ${circleData.center.lng.toFixed(6)}<br>
+                Venues: ${venueCount}
+            </div>
+            ${venueCount > 0 ? this.createVenueListHTML(circleData.venues) : ''}
+        `;
+    }
+
+    highlightCircleOnMap(circleData) {
+        // Clear any existing highlights
+        this.clearCircleHighlights();
+        
+        if (!circleData || !circleData.circle) return;
+        
+        // Store reference to highlighted circle
+        this.highlightedCircle = circleData;
+        
+        // Change circle style to highlight it
+        circleData.circle.setStyle({
+            color: '#e74c3c', // Red color for highlight
+            weight: 4,        // Thicker border
+            opacity: 1,
+            fillColor: '#e74c3c',
+            fillOpacity: 0.1  // Light red fill
+        });
+        
+        // Pan to the circle if it's not fully visible
+        this.map.fitBounds(circleData.circle.getBounds(), {
+            padding: [20, 20]
+        });
+    }
+
+    clearCircleHighlights() {
+        if (this.highlightedCircle && this.highlightedCircle.circle) {
+            // Reset to original style
+            this.highlightedCircle.circle.setStyle({
+                color: '#000000',
+                weight: 2,
+                opacity: 1,
+                fillColor: 'transparent',
+                fillOpacity: 0
+            });
+        }
+        this.highlightedCircle = null;
     }
 }
 

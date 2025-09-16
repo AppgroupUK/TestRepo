@@ -55,6 +55,21 @@
                 </div>
             </div>
             <div class="sidebar">
+                <!-- Circle Selection Dropdown (always visible) -->
+                <div class="circle-selection-panel">
+                    <h4>Circle Selection</h4>
+                    <div class="circle-dropdown-container">
+                        <select id="circleDropdown" class="circle-dropdown">
+                            <option value="">Select a circle to view details</option>
+                        </select>
+                    </div>
+                    <div id="circleDetails" class="circle-details" style="display: none;">
+                        <div class="circle-info">
+                            <p id="circleInfo">No circle selected</p>
+                        </div>
+                    </div>
+                </div>
+
                 <div id="circleControls" class="circle-controls-panel" style="display: none;">
                     <h4>Circle Controls</h4>
                     <div class="circle-info">
