@@ -25,12 +25,22 @@
                     <select id="countyFilter">
                         <option value="">All Counties</option>
                     </select>
-                    <select id="countyGroupFilter">
-                        <option value="">All County Groups</option>
-                    </select>
                 </div>
                 <div class="stats">
                     <span id="venueCount">Loading venues...</span>
+                </div>
+                <div class="circle-controls">
+                    <div class="circle-mode-toggle">
+                        <label class="switch">
+                            <input type="checkbox" id="circleModeSwitch">
+                            <span class="slider"></span>
+                        </label>
+                        <span class="mode-label">Circle Mode</span>
+                    </div>
+                    <button id="addCircleBtn" class="add-circle-btn" disabled>Add Circle</button>
+                    <button id="clearAllCircles" class="clear-circles-btn" style="display: none;">Clear All Circles</button>
+                    <button id="saveCirclesBtn" class="save-circles-btn" style="display: none;">Save Circles</button>
+                    <button id="loadCirclesBtn" class="load-circles-btn">Load Circles</button>
                 </div>
             </div>
         </header>
@@ -49,9 +59,27 @@
                 <div id="venueList" class="venue-list">
                     <p>Click on a marker to view venue details</p>
                 </div>
-                <div id="countyLegend" class="county-legend">
-                    <h4>Counties</h4>
-                    <div id="legendContent"></div>
+                <div id="circleControls" class="circle-controls-panel" style="display: none;">
+                    <h4>Circle Controls</h4>
+                    <div class="circle-info">
+                        <p id="circleInfo">No circle selected</p>
+                    </div>
+                    <div class="radius-control">
+                        <label for="radiusSlider">Radius (meters):</label>
+                        <input type="range" id="radiusSlider" min="10000" max="100000" value="10000" step="1000">
+                        <span id="radiusValue">10000m</span>
+                    </div>
+                    <div class="circle-actions">
+                        <button id="deleteSelectedCircle" class="delete-circle-btn" disabled>Delete Selected Circle</button>
+                    </div>
+                    <div class="circle-persistence">
+                        <h5>Save & Load</h5>
+                        <div class="persistence-buttons">
+                            <button id="exportCirclesBtn" class="export-circles-btn" disabled>Export Circles</button>
+                            <button id="importCirclesBtn" class="import-circles-btn">Import Circles</button>
+                        </div>
+                        <input type="file" id="circleFileInput" accept=".json" style="display: none;">
+                    </div>
                 </div>
             </div>
         </main>

@@ -206,50 +206,6 @@ main {
     font-size: 0.75rem;
 }
 
-/* County Legend Styles */
-.county-legend {
-    margin-top: 2rem;
-    padding: 1rem;
-    background: rgba(255, 255, 255, 0.9);
-    border-radius: 8px;
-    max-height: 300px;
-    overflow-y: auto;
-}
-
-.county-legend h4 {
-    margin-bottom: 1rem;
-    color: #2c3e50;
-    font-size: 1.1rem;
-    font-weight: 600;
-}
-
-.legend-item {
-    display: flex;
-    align-items: center;
-    padding: 0.5rem 0;
-    cursor: pointer;
-    border-radius: 4px;
-    transition: background-color 0.2s ease;
-}
-
-.legend-item:hover {
-    background-color: rgba(52, 152, 219, 0.1);
-}
-
-.legend-color {
-    width: 16px;
-    height: 16px;
-    border-radius: 50%;
-    margin-right: 0.75rem;
-    border: 2px solid #fff;
-    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
-}
-
-.legend-text {
-    font-size: 0.9rem;
-    color: #2c3e50;
-    font-weight: 500;
-}
 
 
 .loading {
@@ -636,6 +592,326 @@ main {
     box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
 }
 
+/* Circle Controls Styles */
+.circle-controls {
+    display: flex;
+    gap: 0.5rem;
+    align-items: center;
+    flex-wrap: wrap;
+}
+
+.circle-mode-toggle {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin-right: 1rem;
+}
+
+.mode-label {
+    font-weight: 600;
+    color: #2c3e50;
+    font-size: 0.9rem;
+}
+
+/* Toggle Switch Styles */
+.switch {
+    position: relative;
+    display: inline-block;
+    width: 50px;
+    height: 24px;
+}
+
+.switch input {
+    opacity: 0;
+    width: 0;
+    height: 0;
+}
+
+.slider {
+    position: absolute;
+    cursor: pointer;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background-color: #bdc3c7;
+    transition: 0.3s;
+    border-radius: 24px;
+}
+
+.slider:before {
+    position: absolute;
+    content: "";
+    height: 18px;
+    width: 18px;
+    left: 3px;
+    bottom: 3px;
+    background-color: white;
+    transition: 0.3s;
+    border-radius: 50%;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+}
+
+input:checked + .slider {
+    background-color: #27ae60;
+}
+
+input:checked + .slider:before {
+    transform: translateX(26px);
+}
+
+.slider:hover {
+    box-shadow: 0 0 8px rgba(39, 174, 96, 0.3);
+}
+
+input:checked + .slider:hover {
+    box-shadow: 0 0 8px rgba(39, 174, 96, 0.5);
+}
+
+.add-circle-btn, .clear-circles-btn {
+    padding: 0.5rem 1rem;
+    border: none;
+    border-radius: 20px;
+    cursor: pointer;
+    font-weight: 600;
+    font-size: 0.9rem;
+    transition: all 0.3s ease;
+}
+
+.add-circle-btn {
+    background: #27ae60;
+    color: white;
+}
+
+.add-circle-btn:hover {
+    background: #229954;
+    transform: translateY(-1px);
+}
+
+.add-circle-btn:active {
+    transform: translateY(0);
+    background: #1e8449;
+}
+
+.clear-circles-btn, .save-circles-btn, .load-circles-btn {
+    background: #e74c3c;
+    color: white;
+}
+
+.clear-circles-btn:hover, .save-circles-btn:hover, .load-circles-btn:hover {
+    background: #c0392b;
+    transform: translateY(-1px);
+}
+
+.save-circles-btn {
+    background: #3498db;
+}
+
+.save-circles-btn:hover {
+    background: #2980b9;
+}
+
+.load-circles-btn {
+    background: #f39c12;
+}
+
+.load-circles-btn:hover {
+    background: #e67e22;
+}
+
+.circle-controls-panel {
+    margin-top: 2rem;
+    padding: 1rem;
+    background: rgba(255, 255, 255, 0.9);
+    border-radius: 8px;
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+}
+
+.circle-controls-panel h4 {
+    margin-bottom: 1rem;
+    color: #2c3e50;
+    font-size: 1.1rem;
+    font-weight: 600;
+    border-bottom: 2px solid #27ae60;
+    padding-bottom: 0.5rem;
+}
+
+.circle-info {
+    margin-bottom: 1rem;
+    padding: 0.75rem;
+    background: rgba(39, 174, 96, 0.1);
+    border-radius: 6px;
+    border-left: 4px solid #27ae60;
+}
+
+.circle-info p {
+    margin: 0;
+    color: #2c3e50;
+    font-weight: 500;
+}
+
+.radius-control {
+    margin-bottom: 1rem;
+}
+
+.radius-control label {
+    display: block;
+    margin-bottom: 0.5rem;
+    color: #2c3e50;
+    font-weight: 600;
+}
+
+.radius-control input[type="range"] {
+    width: 100%;
+    margin-bottom: 0.5rem;
+    -webkit-appearance: none;
+    appearance: none;
+    height: 6px;
+    border-radius: 3px;
+    background: #ddd;
+    outline: none;
+}
+
+.radius-control input[type="range"]::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    background: #27ae60;
+    cursor: pointer;
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2);
+    transition: all 0.2s ease;
+}
+
+.radius-control input[type="range"]::-webkit-slider-thumb:hover {
+    transform: scale(1.1);
+    box-shadow: 0 4px 8px rgba(39, 174, 96, 0.4);
+}
+
+.radius-control input[type="range"]::-moz-range-thumb {
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    background: #27ae60;
+    cursor: pointer;
+    border: none;
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2);
+    transition: all 0.2s ease;
+}
+
+.radius-control input[type="range"]::-moz-range-thumb:hover {
+    transform: scale(1.1);
+    box-shadow: 0 4px 8px rgba(39, 174, 96, 0.4);
+}
+
+#radiusValue {
+    display: inline-block;
+    background: #27ae60;
+    color: white;
+    padding: 0.25rem 0.75rem;
+    border-radius: 12px;
+    font-size: 0.85rem;
+    font-weight: 600;
+}
+
+.circle-actions {
+    display: flex;
+    gap: 0.5rem;
+}
+
+.delete-circle-btn {
+    padding: 0.5rem 1rem;
+    background: #e74c3c;
+    color: white;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    font-weight: 600;
+    font-size: 0.9rem;
+    transition: all 0.3s ease;
+}
+
+.delete-circle-btn:hover:not(:disabled) {
+    background: #c0392b;
+    transform: translateY(-1px);
+}
+
+.delete-circle-btn:disabled {
+    background: #bdc3c7;
+    cursor: not-allowed;
+    transform: none;
+}
+
+/* Circle Persistence Styles */
+.circle-persistence {
+    margin-top: 1.5rem;
+    padding-top: 1rem;
+    border-top: 2px solid #ecf0f1;
+}
+
+.circle-persistence h5 {
+    margin: 0 0 1rem 0;
+    color: #2c3e50;
+    font-size: 1rem;
+    font-weight: 600;
+}
+
+.persistence-buttons {
+    display: flex;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+}
+
+.export-circles-btn, .import-circles-btn {
+    padding: 0.5rem 1rem;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    font-weight: 600;
+    font-size: 0.85rem;
+    transition: all 0.3s ease;
+    flex: 1;
+    min-width: 120px;
+}
+
+.export-circles-btn {
+    background: #27ae60;
+    color: white;
+}
+
+.export-circles-btn:hover:not(:disabled) {
+    background: #229954;
+    transform: translateY(-1px);
+}
+
+.export-circles-btn:disabled {
+    background: #bdc3c7;
+    cursor: not-allowed;
+    transform: none;
+}
+
+.import-circles-btn {
+    background: #8e44ad;
+    color: white;
+}
+
+.import-circles-btn:hover {
+    background: #7d3c98;
+    transform: translateY(-1px);
+}
+
+/* Circle styling on map */
+.circle-selected {
+    stroke: #e74c3c !important;
+    stroke-width: 4px !important;
+    stroke-dasharray: 5, 5 !important;
+}
+
+.circle-dragging {
+    cursor: move !important;
+}
+
 /* Responsive adjustments for zoom slider */
 @media (max-width: 768px) {
     .zoom-slider-container {
@@ -649,6 +925,30 @@ main {
     
     .zoom-labels {
         gap: 130px;
+    }
+    
+    .circle-controls {
+        flex-direction: column;
+        gap: 0.5rem;
+    }
+    
+    .circle-mode-toggle {
+        margin-right: 0;
+        margin-bottom: 0.5rem;
+        justify-content: center;
+    }
+    
+    .add-circle-btn, .clear-circles-btn, .save-circles-btn, .load-circles-btn {
+        width: 100%;
+        text-align: center;
+    }
+    
+    .persistence-buttons {
+        flex-direction: column;
+    }
+    
+    .export-circles-btn, .import-circles-btn {
+        width: 100%;
     }
 }
 

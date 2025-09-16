@@ -11,19 +11,12 @@ class VenueMapApp {
         // Color palette for counties (will be generated after venues are loaded)
         this.countyColors = {};
         
-        // County groups for filtering
-        this.countyGroups = {
-            "North West": ["Greater Manchester", "Lancashire", "Cheshire", "Merseyside"],
-            "North East": ["Tyne and Wear", "County Durham", "Cleveland", "North Yorkshire", "Cumbria"],
-            "Yorkshire & Humber": ["South Yorkshire", "West Yorkshire", "North Yorkshire", "East Yorkshire"],
-            "West Midlands": ["West Midlands", "Staffordshire", "Worcestershire", "Warwickshire", "Shropshire"],
-            "East Midlands": ["Nottinghamshire", "Derbyshire", "Leicestershire", "Northamptonshire", "Lincolnshire"],
-            "London & South East": ["Greater London", "Kent", "Surrey", "Hertfordshire", "Essex", "Buckinghamshire", "Berkshire", "Oxfordshire"],
-            "South West": ["Devon", "Cornwall", "Dorset", "Somerset", "Wiltshire", "Gloucestershire", "Bristol"],
-            "East of England": ["Norfolk", "Suffolk", "Cambridgeshire", "Hampshire"],
-            "Scotland": ["Edinburgh", "Glasgow", "Aberdeenshire", "Fife", "Renfrewshire", "Dundee", "North Lanarkshire", "Falkirk", "Perth and Kinross", "East Ayrshire"],
-            "Wales": ["Cardiff", "Clwyd", "West Glamorgan", "Gwent"]
-        };
+        // Circle management
+        this.circles = [];
+        this.selectedCircle = null;
+        this.circleCounter = 0;
+        this.circleModeEnabled = false;
+        
         
         this.init();
     }
@@ -206,33 +199,6 @@ class VenueMapApp {
         }
     }
 
-    createCountyLegend() {
-        const legendContent = document.getElementById('legendContent');
-        if (!legendContent) return;
-
-        // Get counties sorted by venue count (most venues first)
-        const countyCounts = {};
-        this.venues.forEach(venue => {
-            countyCounts[venue.county] = (countyCounts[venue.county] || 0) + 1;
-        });
-
-        const sortedCounties = Object.keys(countyCounts)
-            .sort((a, b) => countyCounts[b] - countyCounts[a])
-            .slice(0, 20); // Show top 20 counties
-
-        const legendItems = sortedCounties.map(county => {
-            const color = this.countyColors[county] || '#666666';
-            const count = countyCounts[county];
-            return `
-                <div class="legend-item" onclick="app.filterByCounty('${county}')">
-                    <span class="legend-color" style="background-color: ${color}"></span>
-                    <span class="legend-text">${county} (${count})</span>
-                </div>
-            `;
-        }).join('');
-
-        legendContent.innerHTML = legendItems;
-    }
 
     filterByCounty(county) {
         const countyFilter = document.getElementById('countyFilter');
@@ -297,56 +263,6 @@ class VenueMapApp {
         }
     }
 
-    zoomToCountyGroup(groupName) {
-        if (!groupName) {
-            // If no group selected, fit to all visible markers
-            this.zoomToAllVenues();
-            return;
-        }
-
-        const countiesInGroup = this.countyGroups[groupName];
-        if (!countiesInGroup) return;
-
-        // Get all venues in the specified county group that have coordinates
-        const groupVenues = this.filteredVenues.filter(venue => 
-            countiesInGroup.includes(venue.county) && venue.coordinates
-        );
-
-        if (groupVenues.length === 0) {
-            return;
-        }
-
-        // Calculate bounding box for all venues in the group
-        let minLat = groupVenues[0].coordinates[0];
-        let maxLat = groupVenues[0].coordinates[0];
-        let minLng = groupVenues[0].coordinates[1];
-        let maxLng = groupVenues[0].coordinates[1];
-
-        groupVenues.forEach(venue => {
-            const [lat, lng] = venue.coordinates;
-            minLat = Math.min(minLat, lat);
-            maxLat = Math.max(maxLat, lat);
-            minLng = Math.min(minLng, lng);
-            maxLng = Math.max(maxLng, lng);
-        });
-
-        // Add some padding around the bounds
-        const latPadding = (maxLat - minLat) * 0.1;
-        const lngPadding = (maxLng - minLng) * 0.1;
-
-        const bounds = [
-            [minLat - latPadding, minLng - lngPadding], // Southwest corner
-            [maxLat + latPadding, maxLng + lngPadding]   // Northeast corner
-        ];
-
-        // Smooth zoom to the group bounds
-        this.map.fitBounds(bounds, {
-            padding: [20, 20], // Add padding around the bounds
-            maxZoom: 12 // Don't zoom in too close
-        });
-        // Update slider after zoom
-        setTimeout(() => this.updateZoomSlider(), 300);
-    }
 
     zoomToAllVenues() {
         // Get all venues with coordinates
@@ -430,9 +346,6 @@ class VenueMapApp {
             // Generate county color map after venues are loaded
             this.countyColors = this.generateCountyColorMap();
             
-            // Create county legend
-            this.createCountyLegend();
-            
             // Load county boundaries
             this.loadCountyBoundaries();
             
@@ -483,6 +396,9 @@ class VenueMapApp {
 
         // Initialize zoom slider with current zoom level
         this.updateZoomSlider();
+        
+        // Load circles from localStorage
+        this.loadFromLocalStorage();
     }
 
     async addVenuesToMap() {
@@ -641,66 +557,25 @@ class VenueMapApp {
 
     updateVenueList() {
         const venueList = document.getElementById('venueList');
-        const countyGroupFilter = document.getElementById('countyGroupFilter');
-        const isCountyGroupSelected = countyGroupFilter && countyGroupFilter.value !== '';
         
         if (this.filteredVenues.length === 0) {
             venueList.innerHTML = '<p class="loading">No venues found matching your criteria.</p>';
             return;
         }
 
-        let venueItems;
-        
-        if (isCountyGroupSelected) {
-            // Group venues by county within the selected county group
-            const venuesByCounty = {};
-            this.filteredVenues.forEach(venue => {
-                if (!venuesByCounty[venue.county]) {
-                    venuesByCounty[venue.county] = [];
-                }
-                venuesByCounty[venue.county].push(venue);
-            });
-
-            // Sort counties alphabetically
-            const sortedCounties = Object.keys(venuesByCounty).sort();
-            
-            venueItems = sortedCounties.map(county => {
-                const countyVenues = venuesByCounty[county];
-                const countySection = `
-                    <div class="county-section">
-                        <div class="county-section-header">
-                            <h4>${county}</h4>
-                            <span class="county-venue-count">${countyVenues.length} venue${countyVenues.length !== 1 ? 's' : ''}</span>
-                        </div>
-                        <div class="county-venues">
-                            ${countyVenues.map(venue => `
-                                <div class="venue-item-simple ${venue === this.selectedVenue ? 'selected' : ''}" 
-                                     data-venue-id="${venue.id}" 
-                                     onclick="app.selectVenueFromList(${venue.id})">
-                                    <div class="venue-name-simple">${venue.name}</div>
-                                </div>
-                            `).join('')}
-                        </div>
-                    </div>
-                `;
-                return countySection;
-            }).join('');
-        } else {
-            // Show full details when no county group is selected
-            venueItems = this.filteredVenues.map(venue => `
-                <div class="venue-item ${venue === this.selectedVenue ? 'selected' : ''}" 
-                     data-venue-id="${venue.id}" 
-                     onclick="app.selectVenueFromList(${venue.id})">
-                    <div class="venue-name">${venue.name}</div>
-                    <div class="venue-address">${venue.fullAddress}</div>
-                    <div class="venue-details">
-                        <span class="venue-tag ${venue.type.toLowerCase()}">${venue.type}</span>
-                        ${venue.county ? `<span class="venue-tag county">${venue.county}</span>` : ''}
-                        ${venue.phone ? `<span class="venue-tag">${venue.phone}</span>` : ''}
-                    </div>
+        const venueItems = this.filteredVenues.map(venue => `
+            <div class="venue-item ${venue === this.selectedVenue ? 'selected' : ''}" 
+                 data-venue-id="${venue.id}" 
+                 onclick="app.selectVenueFromList(${venue.id})">
+                <div class="venue-name">${venue.name}</div>
+                <div class="venue-address">${venue.fullAddress}</div>
+                <div class="venue-details">
+                    <span class="venue-tag ${venue.type.toLowerCase()}">${venue.type}</span>
+                    ${venue.county ? `<span class="venue-tag county">${venue.county}</span>` : ''}
+                    ${venue.phone ? `<span class="venue-tag">${venue.phone}</span>` : ''}
                 </div>
-            `).join('');
-        }
+            </div>
+        `).join('');
 
         venueList.innerHTML = venueItems;
     }
@@ -759,14 +634,6 @@ class VenueMapApp {
             }, 100);
         });
 
-        document.getElementById('countyGroupFilter').addEventListener('change', (e) => {
-            const selectedGroup = e.target.value;
-            this.applyFilters();
-            // Add a small delay to ensure markers are updated before zooming
-            setTimeout(() => {
-                this.zoomToCountyGroup(selectedGroup);
-            }, 100);
-        });
 
         // Zoom slider functionality
         const zoomSlider = document.getElementById('zoomSlider');
@@ -782,11 +649,60 @@ class VenueMapApp {
             const sliderValue = this.zoomLevelToSlider(currentZoom);
             zoomSlider.value = sliderValue;
         });
+
+        // Add circle button
+        document.getElementById('addCircleBtn').addEventListener('click', () => {
+            this.addCircleAtCenter();
+        });
+
+        // Clear all circles
+        document.getElementById('clearAllCircles').addEventListener('click', () => {
+            this.clearAllCircles();
+        });
+
+        // Radius slider
+        document.getElementById('radiusSlider').addEventListener('input', (e) => {
+            this.updateCircleRadius(parseInt(e.target.value));
+        });
+
+        // Delete selected circle
+        document.getElementById('deleteSelectedCircle').addEventListener('click', () => {
+            this.deleteSelectedCircle();
+        });
+
+        // Save circles
+        document.getElementById('saveCirclesBtn').addEventListener('click', () => {
+            this.saveCirclesToFile();
+        });
+
+        // Load circles
+        document.getElementById('loadCirclesBtn').addEventListener('click', () => {
+            this.loadCirclesFromFile();
+        });
+
+        // Export circles
+        document.getElementById('exportCirclesBtn').addEventListener('click', () => {
+            this.exportCircles();
+        });
+
+        // Import circles
+        document.getElementById('importCirclesBtn').addEventListener('click', () => {
+            document.getElementById('circleFileInput').click();
+        });
+
+        // Handle file input
+        document.getElementById('circleFileInput').addEventListener('change', (e) => {
+            this.importCirclesFromFile(e);
+        });
+
+        // Circle mode toggle
+        document.getElementById('circleModeSwitch').addEventListener('change', (e) => {
+            this.toggleCircleMode(e.target.checked);
+        });
     }
 
     populateFilters() {
         const countyFilter = document.getElementById('countyFilter');
-        const countyGroupFilter = document.getElementById('countyGroupFilter');
         
         // Populate county filter with venue counts
         const countyCounts = {};
@@ -801,21 +717,6 @@ class VenueMapApp {
             const count = countyCounts[county];
             option.textContent = `${county} - ${count} venue${count !== 1 ? 's' : ''}`;
             countyFilter.appendChild(option);
-        });
-
-        // Populate county group filter with venue counts
-        Object.keys(this.countyGroups).forEach(groupName => {
-            const countiesInGroup = this.countyGroups[groupName];
-            const groupCount = this.venues.filter(venue => 
-                countiesInGroup.includes(venue.county)
-            ).length;
-            
-            if (groupCount > 0) {
-                const option = document.createElement('option');
-                option.value = groupName;
-                option.textContent = `${groupName} - ${groupCount} venue${groupCount !== 1 ? 's' : ''}`;
-                countyGroupFilter.appendChild(option);
-            }
         });
     }
 
@@ -834,7 +735,6 @@ class VenueMapApp {
     applyFilters() {
         const typeFilter = document.getElementById('typeFilter').value;
         const countyFilter = document.getElementById('countyFilter').value;
-        const countyGroupFilter = document.getElementById('countyGroupFilter').value;
         
         let filtered = [...this.venues];
         
@@ -858,14 +758,6 @@ class VenueMapApp {
         // Apply county filter
         if (countyFilter) {
             filtered = filtered.filter(venue => venue.county === countyFilter);
-        }
-        
-        // Apply county group filter
-        if (countyGroupFilter) {
-            const countiesInGroup = this.countyGroups[countyGroupFilter];
-            if (countiesInGroup) {
-                filtered = filtered.filter(venue => countiesInGroup.includes(venue.county));
-            }
         }
         
         this.filteredVenues = filtered;
@@ -907,13 +799,9 @@ class VenueMapApp {
 
     updateSidebarTitle() {
         const sidebarTitle = document.querySelector('.sidebar h3');
-        const countyGroupFilter = document.getElementById('countyGroupFilter');
         const countyFilter = document.getElementById('countyFilter');
         
-        if (countyGroupFilter && countyGroupFilter.value !== '') {
-            // Show county group name
-            sidebarTitle.textContent = countyGroupFilter.value;
-        } else if (countyFilter && countyFilter.value !== '') {
+        if (countyFilter && countyFilter.value !== '') {
             // Show county name
             sidebarTitle.textContent = countyFilter.value;
         } else {
@@ -1022,6 +910,441 @@ class VenueMapApp {
         this.updateVenueList();
         // Restore the appropriate title based on current filters
         this.updateSidebarTitle();
+    }
+
+    // Circle Management Methods
+    toggleCircleMode(enabled) {
+        this.circleModeEnabled = enabled;
+        const addCircleBtn = document.getElementById('addCircleBtn');
+        const circleControls = document.getElementById('circleControls');
+        
+        if (enabled) {
+            addCircleBtn.disabled = false;
+            if (this.circles.length > 0) {
+                circleControls.style.display = 'block';
+            }
+            this.enableCircleInteractions();
+        } else {
+            addCircleBtn.disabled = true;
+            circleControls.style.display = 'none';
+            this.deselectCircle();
+            this.disableCircleInteractions();
+        }
+    }
+
+    enableCircleInteractions() {
+        this.circles.forEach(circleData => {
+            const circle = circleData.circle;
+            circle.setStyle({ cursor: 'pointer' });
+            circle.off('click');
+            circle.on('click', (e) => {
+                e.originalEvent.stopPropagation();
+                this.selectCircle(circleData);
+            });
+        });
+    }
+
+    disableCircleInteractions() {
+        this.circles.forEach(circleData => {
+            const circle = circleData.circle;
+            circle.setStyle({ cursor: 'default' });
+            circle.off('click');
+        });
+    }
+
+    addCircleAtCenter() {
+        if (!this.circleModeEnabled) return;
+        
+        // Get the current map center
+        const latlng = this.map.getCenter();
+        const radius = 10000; // Default radius in meters
+        
+        // Create circle
+        const circle = L.circle(latlng, {
+            radius: radius,
+            color: '#000000',
+            weight: 2,
+            opacity: 1,
+            fillColor: 'transparent',
+            fillOpacity: 0
+        }).addTo(this.map);
+        
+        // Add circle data
+        const circleData = {
+            id: ++this.circleCounter,
+            circle: circle,
+            center: latlng,
+            radius: radius
+        };
+        
+        this.circles.push(circleData);
+        
+        // Add event listeners for selection and dragging
+        this.addCircleEventListeners(circleData);
+        
+        // Update UI
+        this.updateCircleControls();
+        this.showClearButton();
+        this.showCircleControls();
+        this.updatePersistenceButtons();
+        
+        // Auto-save to localStorage
+        this.saveToLocalStorage();
+        
+        // Select the newly created circle
+        this.selectCircle(circleData);
+    }
+
+    addCircleEventListeners(circleData) {
+        const circle = circleData.circle;
+        
+        // Click to select (only if circle mode is enabled)
+        if (this.circleModeEnabled) {
+            circle.on('click', (e) => {
+                e.originalEvent.stopPropagation();
+                this.selectCircle(circleData);
+            });
+        }
+        
+        // Drag functionality (only if circle mode is enabled)
+        if (this.circleModeEnabled) {
+            let isDragging = false;
+            let startLatLng = null;
+            
+            circle.on('mousedown', (e) => {
+                isDragging = true;
+                startLatLng = e.latlng;
+                circle.setStyle({ cursor: 'move' });
+                this.map.dragging.disable();
+            });
+            
+            this.map.on('mousemove', (e) => {
+                if (isDragging && circleData === this.selectedCircle) {
+                    const newCenter = e.latlng;
+                    circle.setLatLng(newCenter);
+                    circleData.center = newCenter;
+                }
+            });
+            
+            this.map.on('mouseup', () => {
+                if (isDragging) {
+                    isDragging = false;
+                    circle.setStyle({ cursor: 'pointer' });
+                    this.map.dragging.enable();
+                    
+                    // Auto-save to localStorage after dragging
+                    this.saveToLocalStorage();
+                }
+            });
+        }
+    }
+
+    selectCircle(circleData) {
+        if (!this.circleModeEnabled) return;
+        
+        // Deselect previous circle
+        this.deselectCircle();
+        
+        // Select new circle
+        this.selectedCircle = circleData;
+        circleData.circle.setStyle({
+            color: '#e74c3c',
+            weight: 4,
+            opacity: 1,
+            dashArray: '5, 5'
+        });
+        
+        // Update UI
+        this.updateCircleControls();
+        this.updateRadiusSlider(circleData.radius);
+    }
+
+    deselectCircle() {
+        if (this.selectedCircle) {
+            this.selectedCircle.circle.setStyle({
+                color: '#000000',
+                weight: 2,
+                opacity: 1,
+                dashArray: null
+            });
+            this.selectedCircle = null;
+        }
+        this.updateCircleControls();
+    }
+
+    updateCircleRadius(radius) {
+        if (this.selectedCircle) {
+            this.selectedCircle.radius = radius;
+            this.selectedCircle.circle.setRadius(radius);
+            document.getElementById('radiusValue').textContent = `${radius.toLocaleString()}m`;
+            
+            // Auto-save to localStorage
+            this.saveToLocalStorage();
+        }
+    }
+
+    updateRadiusSlider(radius) {
+        const slider = document.getElementById('radiusSlider');
+        const valueDisplay = document.getElementById('radiusValue');
+        slider.value = radius;
+        valueDisplay.textContent = `${radius.toLocaleString()}m`;
+    }
+
+    updateCircleControls() {
+        const circleInfo = document.getElementById('circleInfo');
+        const deleteButton = document.getElementById('deleteSelectedCircle');
+        
+        if (this.selectedCircle) {
+            circleInfo.textContent = `Circle ${this.selectedCircle.id} - Radius: ${this.selectedCircle.radius.toLocaleString()}m`;
+            deleteButton.disabled = false;
+        } else {
+            circleInfo.textContent = 'No circle selected';
+            deleteButton.disabled = true;
+        }
+    }
+
+    deleteSelectedCircle() {
+        if (this.selectedCircle) {
+            // Remove from map
+            this.map.removeLayer(this.selectedCircle.circle);
+            
+            // Remove from array
+            const index = this.circles.indexOf(this.selectedCircle);
+            if (index > -1) {
+                this.circles.splice(index, 1);
+            }
+            
+            // Clear selection
+            this.selectedCircle = null;
+            
+            // Update UI
+            this.updateCircleControls();
+            this.updateClearButtonVisibility();
+            this.updatePersistenceButtons();
+            
+            // Auto-save to localStorage
+            this.saveToLocalStorage();
+        }
+    }
+
+    clearAllCircles() {
+        // Remove all circles from map
+        this.circles.forEach(circleData => {
+            this.map.removeLayer(circleData.circle);
+        });
+        
+        // Clear array
+        this.circles = [];
+        this.selectedCircle = null;
+        
+        // Update UI
+        this.updateCircleControls();
+        this.updateClearButtonVisibility();
+        this.updatePersistenceButtons();
+        this.hideCircleControls();
+        
+        // Auto-save to localStorage
+        this.saveToLocalStorage();
+    }
+
+    showClearButton() {
+        const clearButton = document.getElementById('clearAllCircles');
+        if (this.circles.length > 0) {
+            clearButton.style.display = 'block';
+        }
+    }
+
+    updateClearButtonVisibility() {
+        const clearButton = document.getElementById('clearAllCircles');
+        if (this.circles.length === 0) {
+            clearButton.style.display = 'none';
+        }
+    }
+
+    showCircleControls() {
+        const circleControls = document.getElementById('circleControls');
+        circleControls.style.display = 'block';
+    }
+
+    hideCircleControls() {
+        const circleControls = document.getElementById('circleControls');
+        circleControls.style.display = 'none';
+    }
+
+    // Circle Persistence Methods
+    saveCirclesToFile() {
+        if (this.circles.length === 0) {
+            alert('No circles to save!');
+            return;
+        }
+
+        const circlesData = this.circles.map(circleData => ({
+            id: circleData.id,
+            center: {
+                lat: circleData.center.lat,
+                lng: circleData.center.lng
+            },
+            radius: circleData.radius
+        }));
+
+        const dataStr = JSON.stringify(circlesData, null, 2);
+        const dataBlob = new Blob([dataStr], { type: 'application/json' });
+        
+        const link = document.createElement('a');
+        link.href = URL.createObjectURL(dataBlob);
+        link.download = `circles_${new Date().toISOString().split('T')[0]}.json`;
+        link.click();
+        
+        URL.revokeObjectURL(link.href);
+    }
+
+    loadCirclesFromFile() {
+        // Try to load from localStorage first
+        const savedCircles = localStorage.getItem('venueMapCircles');
+        if (savedCircles) {
+            try {
+                const circlesData = JSON.parse(savedCircles);
+                this.loadCirclesData(circlesData);
+                alert(`Loaded ${circlesData.length} circles from local storage!`);
+            } catch (error) {
+                console.error('Error loading circles from localStorage:', error);
+                alert('Error loading circles from local storage!');
+            }
+        } else {
+            alert('No saved circles found in local storage. Use "Import Circles" to load from a file.');
+        }
+    }
+
+    exportCircles() {
+        if (this.circles.length === 0) {
+            alert('No circles to export!');
+            return;
+        }
+
+        const circlesData = this.circles.map(circleData => ({
+            id: circleData.id,
+            center: {
+                lat: circleData.center.lat,
+                lng: circleData.center.lng
+            },
+            radius: circleData.radius,
+            created: new Date().toISOString()
+        }));
+
+        const dataStr = JSON.stringify(circlesData, null, 2);
+        const dataBlob = new Blob([dataStr], { type: 'application/json' });
+        
+        const link = document.createElement('a');
+        link.href = URL.createObjectURL(dataBlob);
+        link.download = `venue_map_circles_${new Date().toISOString().split('T')[0]}.json`;
+        link.click();
+        
+        URL.revokeObjectURL(link.href);
+    }
+
+    importCirclesFromFile(event) {
+        const file = event.target.files[0];
+        if (!file) return;
+
+        const reader = new FileReader();
+        reader.onload = (e) => {
+            try {
+                const circlesData = JSON.parse(e.target.result);
+                this.loadCirclesData(circlesData);
+                alert(`Imported ${circlesData.length} circles from file!`);
+            } catch (error) {
+                console.error('Error parsing circles file:', error);
+                alert('Error reading circles file. Please make sure it\'s a valid JSON file.');
+            }
+        };
+        reader.readAsText(file);
+        
+        // Reset file input
+        event.target.value = '';
+    }
+
+    loadCirclesData(circlesData) {
+        // Clear existing circles
+        this.clearAllCircles();
+        
+        // Load new circles
+        circlesData.forEach(circleInfo => {
+            const latlng = L.latLng(circleInfo.center.lat, circleInfo.center.lng);
+            const radius = circleInfo.radius || 10000;
+            
+            // Create circle
+            const circle = L.circle(latlng, {
+                radius: radius,
+                color: '#000000',
+                weight: 2,
+                opacity: 1,
+                fillColor: 'transparent',
+                fillOpacity: 0
+            }).addTo(this.map);
+            
+            // Add circle data
+            const circleData = {
+                id: circleInfo.id || ++this.circleCounter,
+                circle: circle,
+                center: latlng,
+                radius: radius
+            };
+            
+            this.circles.push(circleData);
+            
+            // Add event listeners
+            this.addCircleEventListeners(circleData);
+        });
+        
+        // Update UI
+        this.updateCircleControls();
+        this.showClearButton();
+        if (this.circleModeEnabled) {
+            this.showCircleControls();
+        }
+        this.updatePersistenceButtons();
+        
+        // Save to localStorage
+        this.saveToLocalStorage();
+    }
+
+    saveToLocalStorage() {
+        const circlesData = this.circles.map(circleData => ({
+            id: circleData.id,
+            center: {
+                lat: circleData.center.lat,
+                lng: circleData.center.lng
+            },
+            radius: circleData.radius
+        }));
+        
+        localStorage.setItem('venueMapCircles', JSON.stringify(circlesData));
+    }
+
+    loadFromLocalStorage() {
+        const savedCircles = localStorage.getItem('venueMapCircles');
+        if (savedCircles) {
+            try {
+                const circlesData = JSON.parse(savedCircles);
+                this.loadCirclesData(circlesData);
+                console.log(`Loaded ${circlesData.length} circles from localStorage`);
+            } catch (error) {
+                console.error('Error loading circles from localStorage:', error);
+            }
+        }
+    }
+
+    updatePersistenceButtons() {
+        const saveBtn = document.getElementById('saveCirclesBtn');
+        const exportBtn = document.getElementById('exportCirclesBtn');
+        
+        if (this.circles.length > 0) {
+            saveBtn.style.display = 'block';
+            exportBtn.disabled = false;
+        } else {
+            saveBtn.style.display = 'none';
+            exportBtn.disabled = true;
+        }
     }
 
     showError(message) {
