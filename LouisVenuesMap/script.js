@@ -906,6 +906,9 @@ class VenueMapApp {
             fillOpacity: 0
         }).addTo(this.map);
         
+        // Ensure counter is properly set
+        this.ensureCounterIsCurrent();
+        
         // Add circle data
         const circleData = {
             id: ++this.circleCounter,
@@ -1309,6 +1312,15 @@ class VenueMapApp {
         // Clear existing circles
         this.clearAllCircles();
         
+        // Find the highest ID to set the counter properly
+        let maxId = 0;
+        circlesData.forEach(circleInfo => {
+            if (circleInfo.id && circleInfo.id > maxId) {
+                maxId = circleInfo.id;
+            }
+        });
+        this.circleCounter = maxId;
+        
         // Load new circles
         circlesData.forEach(circleInfo => {
             const latlng = L.latLng(circleInfo.center.lat, circleInfo.center.lng);
@@ -1376,15 +1388,74 @@ class VenueMapApp {
         if (savedCircles) {
             try {
                 const circlesData = JSON.parse(savedCircles);
-                this.loadCirclesData(circlesData);
-                console.log(`Loaded ${circlesData.length} circles from localStorage`);
+                
+                // Check and fix circle IDs if needed
+                const fixedCirclesData = this.fixCircleIds(circlesData);
+                
+                this.loadCirclesData(fixedCirclesData);
+                console.log(`Loaded ${fixedCirclesData.length} circles from localStorage`);
+                
+                // Save the fixed data back to localStorage if changes were made
+                if (JSON.stringify(circlesData) !== JSON.stringify(fixedCirclesData)) {
+                    this.saveFixedCirclesToLocalStorage(fixedCirclesData);
+                    console.log('Fixed circle IDs and saved to localStorage');
+                }
             } catch (error) {
                 console.error('Error loading circles from localStorage:', error);
+                // Initialize dropdown even if loading failed
+                this.updateCircleDropdown();
             }
         } else {
             // Initialize dropdown even if no circles
             this.updateCircleDropdown();
         }
+    }
+
+    fixCircleIds(circlesData) {
+        if (!circlesData || circlesData.length === 0) return circlesData;
+        
+        // Create a copy to avoid modifying the original
+        const fixedData = [...circlesData];
+        
+        // Check if IDs are sequential starting from 1
+        const ids = fixedData.map(circle => circle.id).sort((a, b) => a - b);
+        const expectedIds = Array.from({length: ids.length}, (_, i) => i + 1);
+        
+        // If IDs don't match expected sequence, fix them
+        if (JSON.stringify(ids) !== JSON.stringify(expectedIds)) {
+            console.log('Fixing circle IDs:', ids, '->', expectedIds);
+            
+            // Create a mapping of old IDs to new IDs
+            const idMapping = {};
+            ids.forEach((oldId, index) => {
+                const newId = index + 1;
+                idMapping[oldId] = newId;
+            });
+            
+            // Update all circle IDs
+            fixedData.forEach(circle => {
+                if (circle.id && idMapping[circle.id]) {
+                    circle.id = idMapping[circle.id];
+                }
+            });
+            
+            console.log('Circle IDs fixed successfully');
+        }
+        
+        return fixedData;
+    }
+
+    saveFixedCirclesToLocalStorage(circlesData) {
+        const circlesDataToSave = circlesData.map(circleData => ({
+            id: circleData.id,
+            center: {
+                lat: circleData.center.lat,
+                lng: circleData.center.lng
+            },
+            radius: circleData.radius
+        }));
+        
+        localStorage.setItem('venueMapCircles', JSON.stringify(circlesDataToSave));
     }
 
     updatePersistenceButtons() {
@@ -1517,10 +1588,60 @@ class VenueMapApp {
         }
         this.highlightedCircle = null;
     }
+
+    ensureCounterIsCurrent() {
+        // Find the highest ID among existing circles
+        let maxId = 0;
+        this.circles.forEach(circleData => {
+            if (circleData.id && circleData.id > maxId) {
+                maxId = circleData.id;
+            }
+        });
+        
+        // Set counter to the highest ID found
+        this.circleCounter = maxId;
+    }
+
+    // Manual migration function - can be called from browser console
+    migrateCircleIds() {
+        console.log('Starting circle ID migration...');
+        
+        // Get current circles from localStorage
+        const savedCircles = localStorage.getItem('venueMapCircles');
+        if (!savedCircles) {
+            console.log('No circles found in localStorage');
+            return;
+        }
+        
+        try {
+            const circlesData = JSON.parse(savedCircles);
+            console.log('Current circle IDs:', circlesData.map(c => c.id));
+            
+            // Fix the IDs
+            const fixedCirclesData = this.fixCircleIds(circlesData);
+            console.log('Fixed circle IDs:', fixedCirclesData.map(c => c.id));
+            
+            // Save back to localStorage
+            this.saveFixedCirclesToLocalStorage(fixedCirclesData);
+            
+            // Reload the circles
+            this.loadCirclesData(fixedCirclesData);
+            this.updateCircleDropdown();
+            
+            console.log('Circle ID migration completed successfully!');
+            console.log('You can now refresh the page to see the changes.');
+            
+        } catch (error) {
+            console.error('Error during migration:', error);
+        }
+    }
 }
 
 // Initialize the app when the page loads
 let app;
 document.addEventListener('DOMContentLoaded', () => {
     app = new VenueMapApp();
+    
+    // Make migration function available globally for debugging
+    window.migrateCircleIds = () => app.migrateCircleIds();
 });
