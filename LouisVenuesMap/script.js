@@ -17,6 +17,10 @@ class VenueMapApp {
         this.highlightedCircle = null;
         this.circleCounter = 0;
         this.circleModeEnabled = false;
+        this.circlesVisible = true;
+        
+        // Venue highlighting
+        this.highlightedVenueMarker = null;
         
         
         this.init();
@@ -202,9 +206,20 @@ class VenueMapApp {
 
 
     filterByCounty(county) {
+        console.log('filterByCounty called with:', county);
         const countyFilter = document.getElementById('countyFilter');
         countyFilter.value = county;
         this.applyFilters();
+        
+        // Show county sidebar if a specific county is selected
+        if (county && county !== 'All Counties') {
+            console.log('Showing county sidebar for:', county);
+            this.showCountySidebar(county);
+        } else {
+            console.log('Hiding county sidebar');
+            this.hideCountySidebar();
+        }
+        
         // Add a small delay to ensure markers are updated before zooming
         setTimeout(() => {
             this.zoomToCounty(county);
@@ -581,11 +596,7 @@ class VenueMapApp {
 
         document.getElementById('countyFilter').addEventListener('change', (e) => {
             const selectedCounty = e.target.value;
-            this.applyFilters();
-            // Add a small delay to ensure markers are updated before zooming
-            setTimeout(() => {
-                this.zoomToCounty(selectedCounty);
-            }, 100);
+            this.filterByCounty(selectedCounty);
         });
 
 
@@ -657,6 +668,23 @@ class VenueMapApp {
         // Circle mode toggle
         document.getElementById('circleModeSwitch').addEventListener('change', (e) => {
             this.toggleCircleMode(e.target.checked);
+        });
+
+        // Circle visibility toggle
+        document.getElementById('circleVisibilitySwitch').addEventListener('change', (e) => {
+            this.toggleCircleVisibility(e.target.checked);
+        });
+
+        // County sidebar close button
+        document.getElementById('closeCountySidebar').addEventListener('click', () => {
+            this.hideCountySidebar();
+        });
+
+        // PDF export button (using event delegation since it's dynamically created)
+        document.addEventListener('click', (e) => {
+            if (e.target && e.target.id === 'exportVenuesPDF') {
+                this.exportVenuesToPDF();
+            }
         });
     }
 
@@ -808,24 +836,48 @@ class VenueMapApp {
         const saveCirclesBtn = document.getElementById('saveCirclesBtn');
         const exportCirclesBtn = document.getElementById('exportCirclesBtn');
         const circleControls = document.getElementById('circleControls');
+        const visibilitySwitch = document.getElementById('circleVisibilitySwitch');
         
         if (enabled) {
             addCircleBtn.disabled = false;
             clearCirclesBtn.disabled = false;
             saveCirclesBtn.disabled = false;
             exportCirclesBtn.disabled = false;
+            visibilitySwitch.disabled = false;
             if (this.circles.length > 0) {
                 circleControls.style.display = 'block';
             }
             this.enableCircleInteractions();
+            // Set visibility switch to match current state
+            visibilitySwitch.checked = this.circlesVisible;
         } else {
             addCircleBtn.disabled = true;
             clearCirclesBtn.disabled = true;
             saveCirclesBtn.disabled = true;
             exportCirclesBtn.disabled = true;
+            visibilitySwitch.disabled = true;
             circleControls.style.display = 'none';
             this.deselectCircle();
             this.disableCircleInteractions();
+        }
+    }
+
+    toggleCircleVisibility(visible) {
+        this.circlesVisible = visible;
+        
+        this.circles.forEach(circleData => {
+            if (visible) {
+                // Show circle
+                this.map.addLayer(circleData.circle);
+            } else {
+                // Hide circle
+                this.map.removeLayer(circleData.circle);
+            }
+        });
+        
+        // If hiding circles, clear any highlights
+        if (!visible) {
+            this.clearCircleHighlights();
         }
     }
 
@@ -844,7 +896,12 @@ class VenueMapApp {
                 ...style,
                 radius: radius,
                 interactive: true
-            }).addTo(this.map);
+            });
+            
+            // Add to map only if circles are visible
+            if (this.circlesVisible) {
+                newCircle.addTo(this.map);
+            }
             
             // Update the circle reference and preserve the radius
             circleData.circle = newCircle;
@@ -881,7 +938,12 @@ class VenueMapApp {
                 ...style,
                 radius: radius,
                 interactive: false
-            }).addTo(this.map);
+            });
+            
+            // Add to map only if circles are visible
+            if (this.circlesVisible) {
+                newCircle.addTo(this.map);
+            }
             
             // Update the circle reference and preserve the radius
             circleData.circle = newCircle;
@@ -904,7 +966,12 @@ class VenueMapApp {
             opacity: 1,
             fillColor: 'transparent',
             fillOpacity: 0
-        }).addTo(this.map);
+        });
+        
+        // Add to map only if circles are visible
+        if (this.circlesVisible) {
+            circle.addTo(this.map);
+        }
         
         // Ensure counter is properly set
         this.ensureCounterIsCurrent();
@@ -1067,10 +1134,13 @@ class VenueMapApp {
                 circleData.venues.push({
                     id: venue.id,
                     name: venue.name,
-                    address: venue.address,
+                    address: venue.fullAddress, // Use fullAddress instead of address
                     county: venue.county,
+                    accountManager: venue.accountManager,
+                    phone: venue.phone,
+                    type: venue.type,
                     coordinates: venue.coordinates,
-                    distance: Math.round(distance) // Distance in meters
+                    distance: Math.round(distance / 1000 * 10) / 10 // Distance in kilometers to 1 decimal place
                 });
             }
         });
@@ -1119,7 +1189,12 @@ class VenueMapApp {
             <div class="venue-in-circle">
                 <div class="venue-name">${venue.name}</div>
                 <div class="venue-address">${venue.address}</div>
-                <div class="venue-distance">${venue.distance.toLocaleString()}m away</div>
+                <div class="venue-county">${venue.county}</div>
+                <div class="venue-contact">
+                    <div class="venue-contact-name">${venue.accountManager || 'No contact assigned'}</div>
+                    <div class="venue-contact-phone">${venue.phone || 'No phone number'}</div>
+                </div>
+                <div class="venue-distance">${venue.distance}km away</div>
             </div>
         `).join('');
         
@@ -1128,6 +1203,11 @@ class VenueMapApp {
                 <h5>Venues in Circle:</h5>
                 <div class="venue-list">
                     ${venueItems}
+                </div>
+                <div class="venue-export-actions">
+                    <button id="exportVenuesPDF" class="export-pdf-btn">
+                        📄 Export to PDF
+                    </button>
                 </div>
             </div>
         `;
@@ -1334,7 +1414,12 @@ class VenueMapApp {
                 opacity: 1,
                 fillColor: 'transparent',
                 fillOpacity: 0
-            }).addTo(this.map);
+            });
+            
+            // Add to map only if circles are visible
+            if (this.circlesVisible) {
+                circle.addTo(this.map);
+            }
             
             // Add circle data
             const circleData = {
@@ -1549,6 +1634,292 @@ class VenueMapApp {
             </div>
             ${venueCount > 0 ? this.createVenueListHTML(circleData.venues) : ''}
         `;
+    }
+
+    // County Sidebar Methods
+    showCountySidebar(county) {
+        console.log('showCountySidebar called with:', county);
+        const sidebar = document.getElementById('countySidebar');
+        const title = document.getElementById('countySidebarTitle');
+        
+        if (!sidebar) {
+            console.error('County sidebar element not found!');
+            return;
+        }
+        
+        // Update title
+        title.textContent = `${county} Venues`;
+        
+        // Show sidebar with animation
+        sidebar.style.display = 'block';
+        setTimeout(() => {
+            sidebar.classList.add('show');
+            console.log('Sidebar should now be visible');
+        }, 10);
+        
+        // Populate venue list
+        this.populateCountyVenueList(county);
+    }
+
+    hideCountySidebar() {
+        const sidebar = document.getElementById('countySidebar');
+        sidebar.classList.remove('show');
+        
+        // Hide after animation completes
+        setTimeout(() => {
+            sidebar.style.display = 'none';
+        }, 300);
+    }
+
+    populateCountyVenueList(county) {
+        const venueList = document.getElementById('countyVenueList');
+        
+        // Get venues for the selected county
+        const countyVenues = this.venues.filter(venue => 
+            venue.county === county && venue.coordinates
+        );
+        
+        if (countyVenues.length === 0) {
+            venueList.innerHTML = '<div class="no-venues">No venues found in this county.</div>';
+            return;
+        }
+        
+        // Create venue items
+        const venueItems = countyVenues.map(venue => {
+            return `
+                <div class="county-venue-item" data-venue-id="${venue.id}">
+                    <div class="county-venue-name">${venue.name}</div>
+                    <div class="county-venue-address">${venue.fullAddress}</div>
+                    <div class="county-venue-contact">
+                        <div class="county-venue-contact-name">${venue.accountManager || 'No contact assigned'}</div>
+                        <div class="county-venue-contact-phone">${venue.phone || 'No phone number'}</div>
+                    </div>
+                </div>
+            `;
+        }).join('');
+        
+        venueList.innerHTML = venueItems;
+        
+        // Add click handlers for venue items
+        venueList.querySelectorAll('.county-venue-item').forEach(item => {
+            item.addEventListener('click', () => {
+                const venueId = parseInt(item.dataset.venueId);
+                this.selectVenueFromCountyList(venueId);
+            });
+        });
+    }
+
+    selectVenueFromCountyList(venueId) {
+        // Find the venue
+        const venue = this.venues.find(v => v.id === venueId);
+        if (!venue) return;
+        
+        // Remove previous selection
+        document.querySelectorAll('.county-venue-item').forEach(item => {
+            item.classList.remove('selected');
+        });
+        
+        // Add selection to clicked item
+        const selectedItem = document.querySelector(`[data-venue-id="${venueId}"]`);
+        if (selectedItem) {
+            selectedItem.classList.add('selected');
+        }
+        
+        // Center map on venue
+        if (venue.coordinates) {
+            const [lat, lng] = venue.coordinates;
+            this.map.setView([lat, lng], 12);
+            
+            // Find and highlight the corresponding marker on the map
+            this.highlightVenueMarker(venue);
+        }
+    }
+
+    highlightVenueMarker(venue) {
+        // Clear any existing venue highlights
+        this.clearVenueHighlights();
+        
+        // Find the marker for this venue
+        const markerObj = this.markers.find(m => m.venue.id === venue.id);
+        const marker = markerObj ? markerObj.marker : null;
+        if (marker) {
+            // Store reference to highlighted marker
+            this.highlightedVenueMarker = marker;
+            
+            // Change marker style to highlight it
+            marker.setStyle({
+                radius: 12,
+                fillColor: '#e74c3c',
+                color: '#fff',
+                weight: 4,
+                opacity: 1,
+                fillOpacity: 0.9
+            });
+            
+            // Add pulsing animation class
+            marker.getElement().classList.add('highlighted-venue');
+            
+            // Open popup to show venue info
+            const popupContent = `
+                <div class="venue-popup">
+                    <h4>${venue.name}</h4>
+                    <p><strong>Address:</strong> ${venue.fullAddress}</p>
+                    <p><strong>Contact:</strong> ${venue.accountManager || 'No contact assigned'}</p>
+                    <p><strong>Phone:</strong> ${venue.phone || 'No phone number'}</p>
+                </div>
+            `;
+            marker.bindPopup(popupContent).openPopup();
+        }
+    }
+
+    clearVenueHighlights() {
+        if (this.highlightedVenueMarker) {
+            // Reset marker to original style (it's a circleMarker, not divIcon)
+            const markerObj = this.markers.find(m => m.marker === this.highlightedVenueMarker);
+            if (markerObj) {
+                const venue = markerObj.venue;
+                const countyColor = this.countyColors[venue.county] || '#666666';
+                
+                this.highlightedVenueMarker.setStyle({
+                    radius: 8,
+                    fillColor: countyColor,
+                    color: '#fff',
+                    weight: 2,
+                    opacity: 1,
+                    fillOpacity: 0.8
+                });
+                
+                // Remove pulsing animation class
+                this.highlightedVenueMarker.getElement().classList.remove('highlighted-venue');
+            }
+            this.highlightedVenueMarker.closePopup();
+        }
+        this.highlightedVenueMarker = null;
+    }
+
+    exportVenuesToPDF() {
+        if (!this.selectedCircle || !this.selectedCircle.venues || this.selectedCircle.venues.length === 0) {
+            alert('No venues to export. Please select a circle with venues first.');
+            return;
+        }
+
+        try {
+            // Create new PDF document
+            const { jsPDF } = window.jspdf;
+            const doc = new jsPDF();
+            
+            // Set up fonts and colors
+            doc.setFont('helvetica');
+            
+            // Title
+            doc.setFontSize(20);
+            doc.setTextColor(39, 174, 96); // Green color
+            doc.text('Circle Venues Report', 20, 30);
+            
+            // Circle information
+            doc.setFontSize(12);
+            doc.setTextColor(0, 0, 0);
+            doc.text(`Circle ID: ${this.selectedCircle.id}`, 20, 45);
+            doc.text(`Radius: ${this.selectedCircle.radius.toLocaleString()} meters`, 20, 55);
+            doc.text(`Total Venues: ${this.selectedCircle.venues.length}`, 20, 65);
+            doc.text(`Generated: ${new Date().toLocaleDateString()}`, 20, 75);
+            
+            // Add a line separator
+            doc.setDrawColor(39, 174, 96);
+            doc.setLineWidth(0.5);
+            doc.line(20, 85, 190, 85);
+            
+            // Venue list
+            doc.setFontSize(14);
+            doc.setTextColor(39, 174, 96);
+            doc.text('Venues in Circle:', 20, 100);
+            
+            // Reset for venue details
+            doc.setFontSize(10);
+            doc.setTextColor(0, 0, 0);
+            
+            let yPosition = 115;
+            const pageHeight = 280;
+            const lineHeight = 8;
+            const maxWidth = 170;
+            
+            this.selectedCircle.venues.forEach((venue, index) => {
+                // Check if we need a new page
+                if (yPosition > pageHeight) {
+                    doc.addPage();
+                    yPosition = 20;
+                }
+                
+                // Venue number and name
+                doc.setFontSize(11);
+                doc.setTextColor(39, 174, 96);
+                doc.text(`${index + 1}. ${venue.name}`, 20, yPosition);
+                yPosition += lineHeight;
+                
+                // Venue details
+                doc.setFontSize(9);
+                doc.setTextColor(0, 0, 0);
+                
+                // Address
+                const addressLines = doc.splitTextToSize(`Address: ${venue.address}`, maxWidth);
+                doc.text(addressLines, 25, yPosition);
+                yPosition += addressLines.length * lineHeight;
+                
+                // County
+                doc.text(`County: ${venue.county}`, 25, yPosition);
+                yPosition += lineHeight;
+                
+                // Contact information
+                if (venue.accountManager) {
+                    doc.text(`Contact: ${venue.accountManager}`, 25, yPosition);
+                    yPosition += lineHeight;
+                }
+                
+                if (venue.phone) {
+                    doc.text(`Phone: ${venue.phone}`, 25, yPosition);
+                    yPosition += lineHeight;
+                }
+                
+                // Type
+                if (venue.type) {
+                    doc.text(`Type: ${venue.type}`, 25, yPosition);
+                    yPosition += lineHeight;
+                }
+                
+                // Distance
+                doc.text(`Distance: ${venue.distance}km from circle center`, 25, yPosition);
+                yPosition += lineHeight + 3;
+                
+                // Add a subtle line between venues
+                if (index < this.selectedCircle.venues.length - 1) {
+                    doc.setDrawColor(200, 200, 200);
+                    doc.setLineWidth(0.2);
+                    doc.line(20, yPosition - 1, 190, yPosition - 1);
+                    yPosition += 2;
+                }
+            });
+            
+            // Add footer
+            const pageCount = doc.internal.getNumberOfPages();
+            for (let i = 1; i <= pageCount; i++) {
+                doc.setPage(i);
+                doc.setFontSize(8);
+                doc.setTextColor(128, 128, 128);
+                doc.text(`Page ${i} of ${pageCount}`, 20, 290);
+                doc.text('Generated by Louis Venues Map', 150, 290);
+            }
+            
+            // Save the PDF
+            const fileName = `circle_${this.selectedCircle.id}_venues_${new Date().toISOString().split('T')[0]}.pdf`;
+            doc.save(fileName);
+            
+            // Show success message
+            this.showSuccess(`PDF exported successfully: ${fileName}`);
+            
+        } catch (error) {
+            console.error('Error exporting PDF:', error);
+            this.showError('Failed to export PDF. Please try again.');
+        }
     }
 
     highlightCircleOnMap(circleData) {

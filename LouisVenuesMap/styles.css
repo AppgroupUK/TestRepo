@@ -130,6 +130,170 @@ main {
     z-index: 100;
 }
 
+/* County Sidebar */
+.county-sidebar {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 350px;
+    height: 100vh;
+    background: rgba(255, 255, 255, 0.95);
+    backdrop-filter: blur(10px);
+    border-right: 1px solid rgba(0, 0, 0, 0.1);
+    padding: 0;
+    overflow-y: auto;
+    z-index: 200;
+    box-shadow: 5px 0 20px rgba(0, 0, 0, 0.1);
+    transform: translateX(-100%);
+    transition: transform 0.3s ease;
+    display: none; /* Start hidden */
+}
+
+.county-sidebar.show {
+    transform: translateX(0);
+}
+
+.county-sidebar-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 1.5rem;
+    background: rgba(52, 152, 219, 0.1);
+    border-bottom: 2px solid #3498db;
+    position: sticky;
+    top: 0;
+    z-index: 10;
+}
+
+.county-sidebar-header h3 {
+    margin: 0;
+    color: #2c3e50;
+    font-size: 1.2rem;
+    font-weight: 600;
+}
+
+.close-sidebar-btn {
+    background: none;
+    border: none;
+    font-size: 1.5rem;
+    color: #7f8c8d;
+    cursor: pointer;
+    padding: 0.25rem;
+    border-radius: 4px;
+    transition: all 0.2s ease;
+}
+
+.close-sidebar-btn:hover {
+    background: rgba(231, 76, 60, 0.1);
+    color: #e74c3c;
+}
+
+.county-sidebar-content {
+    padding: 1rem;
+}
+
+.county-venue-list {
+    max-height: calc(100vh - 120px);
+    overflow-y: auto;
+}
+
+.county-venue-item {
+    padding: 1rem;
+    margin-bottom: 0.75rem;
+    background: white;
+    border-radius: 8px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+    border-left: 4px solid #3498db;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.county-venue-item:hover {
+    transform: translateX(4px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+    border-left-color: #2980b9;
+}
+
+.county-venue-item.selected {
+    background: rgba(52, 152, 219, 0.1);
+    border-left-color: #2980b9;
+}
+
+.county-venue-name {
+    font-weight: 600;
+    color: #2c3e50;
+    margin-bottom: 0.5rem;
+    font-size: 1rem;
+}
+
+.county-venue-address {
+    color: #7f8c8d;
+    font-size: 0.9rem;
+    margin-bottom: 0.5rem;
+    line-height: 1.4;
+}
+
+.county-venue-contact {
+    margin-top: 0.5rem;
+    padding: 0.5rem;
+    background: rgba(52, 152, 219, 0.05);
+    border-radius: 6px;
+    border-left: 3px solid #3498db;
+}
+
+.county-venue-contact-name {
+    font-weight: 600;
+    color: #2c3e50;
+    font-size: 0.9rem;
+    margin-bottom: 0.25rem;
+}
+
+.county-venue-contact-phone {
+    color: #7f8c8d;
+    font-size: 0.85rem;
+    font-family: monospace;
+}
+
+.no-venues {
+    text-align: center;
+    padding: 2rem;
+    color: #7f8c8d;
+    font-style: italic;
+}
+
+/* Venue Marker Highlighting - CSS animation for highlighted markers */
+.leaflet-interactive.highlighted-venue {
+    animation: venuePulse 2s infinite;
+}
+
+@keyframes venuePulse {
+    0% {
+        box-shadow: 0 0 0 0 rgba(231, 76, 60, 0.7);
+    }
+    70% {
+        box-shadow: 0 0 0 10px rgba(231, 76, 60, 0);
+    }
+    100% {
+        box-shadow: 0 0 0 0 rgba(231, 76, 60, 0);
+    }
+}
+
+.venue-popup {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+}
+
+.venue-popup h4 {
+    margin: 0 0 0.5rem 0;
+    color: #2c3e50;
+    font-size: 1rem;
+}
+
+.venue-popup p {
+    margin: 0.25rem 0;
+    font-size: 0.9rem;
+    line-height: 1.4;
+}
+
 /* Circle Selection Panel */
 .circle-selection-panel {
     margin-bottom: 2rem;
@@ -229,6 +393,29 @@ main {
         width: 100%;
         height: 300px;
         order: -1;
+    }
+    
+    .county-sidebar {
+        width: 100%;
+        height: 300px;
+        transform: translateY(-100%);
+        transition: transform 0.3s ease;
+    }
+    
+    .county-sidebar.show {
+        transform: translateY(0);
+    }
+    
+    .county-sidebar-header {
+        padding: 1rem;
+    }
+    
+    .county-sidebar-content {
+        padding: 0.75rem;
+    }
+    
+    .county-venue-list {
+        max-height: calc(300px - 80px);
     }
     
     #map {
@@ -479,21 +666,30 @@ main {
 /* Zoom Slider Styles */
 .zoom-slider-container {
     position: absolute;
-    left: 20px;
-    top: 50%;
-    transform: translateY(-50%);
+    top: 20px;
+    left: 50%;
+    transform: translateX(-50%);
     z-index: 1000;
     display: flex;
-    flex-direction: column;
+    flex-direction: row;
     align-items: center;
-    gap: 10px;
+    gap: 0.75rem;
+    background: rgba(255, 255, 255, 0.9);
+    padding: 0.75rem 1.5rem;
+    border-radius: 25px;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+    min-width: 280px;
+}
+
+.zoom-slider-wrapper {
+    position: relative;
+    display: flex;
+    align-items: center;
 }
 
 .zoom-slider {
-    writing-mode: bt-lr; /* IE */
-    -webkit-appearance: slider-vertical; /* WebKit */
-    width: 20px;
-    height: 200px;
+    width: 200px;
+    height: 20px;
     background: transparent;
     outline: none;
     cursor: pointer;
@@ -502,7 +698,7 @@ main {
 .zoom-slider::-webkit-slider-track {
     background: rgba(255, 255, 255, 0.9);
     border-radius: 10px;
-    width: 4px;
+    height: 4px;
     box-shadow: 0 2px 10px rgba(0, 0, 0, 0.15);
 }
 
@@ -547,22 +743,18 @@ main {
     box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
 }
 
-.zoom-labels {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 180px;
-    font-size: 12px;
-    font-weight: 600;
-    color: #2c3e50;
-    text-shadow: 0 1px 2px rgba(255, 255, 255, 0.8);
-}
 
 .zoom-min, .zoom-max {
     background: rgba(255, 255, 255, 0.9);
     padding: 4px 8px;
     border-radius: 12px;
     box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
+    font-size: 12px;
+    font-weight: 600;
+    color: #2c3e50;
+    text-shadow: 0 1px 2px rgba(255, 255, 255, 0.8);
+    white-space: nowrap;
+    pointer-events: none;
 }
 
 /* Circle Controls Styles */
@@ -574,6 +766,13 @@ main {
 }
 
 .circle-mode-toggle {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin-right: 1rem;
+}
+
+.circle-visibility-toggle {
     display: flex;
     align-items: center;
     gap: 0.5rem;
@@ -770,10 +969,72 @@ input:checked + .slider:hover {
     font-size: 0.75rem;
 }
 
+.venue-in-circle .venue-county {
+    color: #6c757d;
+    font-size: 0.75rem;
+    margin-bottom: 0.25rem;
+    font-style: italic;
+}
+
+.venue-in-circle .venue-contact {
+    margin: 0.5rem 0;
+    padding: 0.5rem;
+    background: rgba(52, 152, 219, 0.05);
+    border-radius: 4px;
+    border-left: 3px solid #3498db;
+}
+
+.venue-in-circle .venue-contact-name {
+    font-weight: 600;
+    color: #2c3e50;
+    font-size: 0.8rem;
+    margin-bottom: 0.25rem;
+}
+
+.venue-in-circle .venue-contact-phone {
+    color: #7f8c8d;
+    font-size: 0.75rem;
+    font-family: monospace;
+}
+
 .venue-in-circle .venue-distance {
     color: #007bff;
     font-weight: 500;
     font-size: 0.75rem;
+}
+
+/* PDF Export Button */
+.venue-export-actions {
+    margin-top: 1rem;
+    padding-top: 0.75rem;
+    border-top: 1px solid #dee2e6;
+    text-align: center;
+}
+
+.export-pdf-btn {
+    background: #e74c3c;
+    color: white;
+    border: none;
+    padding: 0.5rem 1rem;
+    border-radius: 6px;
+    cursor: pointer;
+    font-weight: 600;
+    font-size: 0.85rem;
+    transition: all 0.3s ease;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.export-pdf-btn:hover {
+    background: #c0392b;
+    transform: translateY(-1px);
+    box-shadow: 0 4px 8px rgba(231, 76, 60, 0.3);
+}
+
+.export-pdf-btn:active {
+    transform: translateY(0);
+    background: #a93226;
 }
 
 .radius-control {
@@ -941,17 +1202,17 @@ input:checked + .slider:hover {
 /* Responsive adjustments for zoom slider */
 @media (max-width: 768px) {
     .zoom-slider-container {
-        left: 10px;
-        top: 60%;
+        top: 10px;
+        left: 50%;
+        transform: translateX(-50%);
+        min-width: 250px;
+        padding: 0.5rem 1rem;
     }
     
     .zoom-slider {
-        height: 150px;
+        width: 150px;
     }
     
-    .zoom-labels {
-        gap: 130px;
-    }
     
     .circle-controls {
         flex-direction: column;
@@ -959,6 +1220,12 @@ input:checked + .slider:hover {
     }
     
     .circle-mode-toggle {
+        margin-right: 0;
+        margin-bottom: 0.5rem;
+        justify-content: center;
+    }
+    
+    .circle-visibility-toggle {
         margin-right: 0;
         margin-bottom: 0.5rem;
         justify-content: center;
