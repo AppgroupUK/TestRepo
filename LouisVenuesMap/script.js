@@ -206,43 +206,7 @@ class VenueMapApp {
         }
     }
 
-    createCountyLegend() {
-        const legendContent = document.getElementById('legendContent');
-        if (!legendContent) return;
 
-        // Get counties sorted by venue count (most venues first)
-        const countyCounts = {};
-        this.venues.forEach(venue => {
-            countyCounts[venue.county] = (countyCounts[venue.county] || 0) + 1;
-        });
-
-        const sortedCounties = Object.keys(countyCounts)
-            .sort((a, b) => countyCounts[b] - countyCounts[a])
-            .slice(0, 20); // Show top 20 counties
-
-        const legendItems = sortedCounties.map(county => {
-            const color = this.countyColors[county] || '#666666';
-            const count = countyCounts[county];
-            return `
-                <div class="legend-item" onclick="app.filterByCounty('${county}')">
-                    <span class="legend-color" style="background-color: ${color}"></span>
-                    <span class="legend-text">${county} (${count})</span>
-                </div>
-            `;
-        }).join('');
-
-        legendContent.innerHTML = legendItems;
-    }
-
-    filterByCounty(county) {
-        const countyFilter = document.getElementById('countyFilter');
-        countyFilter.value = county;
-        this.applyFilters();
-        // Add a small delay to ensure markers are updated before zooming
-        setTimeout(() => {
-            this.zoomToCounty(county);
-        }, 100);
-    }
 
     getCountyBounds(county) {
         // Get all venues in the specified county that have coordinates
@@ -390,7 +354,6 @@ class VenueMapApp {
         this.setupEventListeners();
         this.populateFilters();
         this.updateVenueCount();
-        this.updateSidebarTitle();
         } catch (error) {
             console.error('Error initializing app:', error);
             this.showError('Failed to load venues. Please check the venue data.');
@@ -430,8 +393,6 @@ class VenueMapApp {
             // Generate county color map after venues are loaded
             this.countyColors = this.generateCountyColorMap();
             
-            // Create county legend
-            this.createCountyLegend();
             
             // Load county boundaries
             this.loadCountyBoundaries();
@@ -621,112 +582,10 @@ class VenueMapApp {
 
     selectVenue(venue) {
         this.selectedVenue = venue;
-        this.updateVenueList();
-        this.highlightSelectedVenue();
     }
 
-    highlightSelectedVenue() {
-        // Remove previous selection
-        document.querySelectorAll('.venue-item').forEach(item => {
-            item.classList.remove('selected');
-        });
 
-        // Highlight selected venue
-        const venueElement = document.querySelector(`[data-venue-id="${venue.id}"]`);
-        if (venueElement) {
-            venueElement.classList.add('selected');
-            venueElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
-        }
-    }
 
-    updateVenueList() {
-        const venueList = document.getElementById('venueList');
-        const countyGroupFilter = document.getElementById('countyGroupFilter');
-        const isCountyGroupSelected = countyGroupFilter && countyGroupFilter.value !== '';
-        
-        if (this.filteredVenues.length === 0) {
-            venueList.innerHTML = '<p class="loading">No venues found matching your criteria.</p>';
-            return;
-        }
-
-        let venueItems;
-        
-        if (isCountyGroupSelected) {
-            // Group venues by county within the selected county group
-            const venuesByCounty = {};
-            this.filteredVenues.forEach(venue => {
-                if (!venuesByCounty[venue.county]) {
-                    venuesByCounty[venue.county] = [];
-                }
-                venuesByCounty[venue.county].push(venue);
-            });
-
-            // Sort counties alphabetically
-            const sortedCounties = Object.keys(venuesByCounty).sort();
-            
-            venueItems = sortedCounties.map(county => {
-                const countyVenues = venuesByCounty[county];
-                const countySection = `
-                    <div class="county-section">
-                        <div class="county-section-header">
-                            <h4>${county}</h4>
-                            <span class="county-venue-count">${countyVenues.length} venue${countyVenues.length !== 1 ? 's' : ''}</span>
-                        </div>
-                        <div class="county-venues">
-                            ${countyVenues.map(venue => `
-                                <div class="venue-item-simple ${venue === this.selectedVenue ? 'selected' : ''}" 
-                                     data-venue-id="${venue.id}" 
-                                     onclick="app.selectVenueFromList(${venue.id})">
-                                    <div class="venue-name-simple">${venue.name}</div>
-                                </div>
-                            `).join('')}
-                        </div>
-                    </div>
-                `;
-                return countySection;
-            }).join('');
-        } else {
-            // Show full details when no county group is selected
-            venueItems = this.filteredVenues.map(venue => `
-                <div class="venue-item ${venue === this.selectedVenue ? 'selected' : ''}" 
-                     data-venue-id="${venue.id}" 
-                     onclick="app.selectVenueFromList(${venue.id})">
-                    <div class="venue-name">${venue.name}</div>
-                    <div class="venue-address">${venue.fullAddress}</div>
-                    <div class="venue-details">
-                        <span class="venue-tag ${venue.type.toLowerCase()}">${venue.type}</span>
-                        ${venue.county ? `<span class="venue-tag county">${venue.county}</span>` : ''}
-                        ${venue.phone ? `<span class="venue-tag">${venue.phone}</span>` : ''}
-                    </div>
-                </div>
-            `).join('');
-        }
-
-        venueList.innerHTML = venueItems;
-    }
-
-    selectVenueFromList(venueId) {
-        const venue = this.venues.find(v => v.id === venueId);
-        if (venue) {
-            this.selectVenue(venue);
-            
-            // Center map on venue if it has coordinates
-            if (venue.coordinates) {
-                this.map.setView(venue.coordinates, 15);
-                // Update slider after zoom
-                setTimeout(() => this.updateZoomSlider(), 100);
-                
-                // Find and open the marker popup
-                const markerData = this.markers.find(m => m.venue.id === venueId);
-                if (markerData) {
-                    markerData.marker.openPopup();
-                }
-            }
-            
-            // Show detailed venue information in a popup/modal
-            this.showVenueDetails(venue);
-        }
-    }
 
     setupEventListeners() {
         // Search functionality
@@ -870,9 +729,7 @@ class VenueMapApp {
         
         this.filteredVenues = filtered;
         this.updateMap();
-        this.updateVenueList();
         this.updateVenueCount();
-        this.updateSidebarTitle();
     }
 
     updateMap() {
@@ -905,22 +762,6 @@ class VenueMapApp {
             count === total ? `${total} venues` : `${count} of ${total} venues`;
     }
 
-    updateSidebarTitle() {
-        const sidebarTitle = document.querySelector('.sidebar h3');
-        const countyGroupFilter = document.getElementById('countyGroupFilter');
-        const countyFilter = document.getElementById('countyFilter');
-        
-        if (countyGroupFilter && countyGroupFilter.value !== '') {
-            // Show county group name
-            sidebarTitle.textContent = countyGroupFilter.value;
-        } else if (countyFilter && countyFilter.value !== '') {
-            // Show county name
-            sidebarTitle.textContent = countyFilter.value;
-        } else {
-            // Default title
-            sidebarTitle.textContent = 'Venue Details';
-        }
-    }
 
     sliderToZoomLevel(sliderValue) {
         // Map slider value (0-24) to zoom level (6-12)
@@ -966,67 +807,11 @@ class VenueMapApp {
         }
     }
 
-    showVenueDetails(venue) {
-        // Create a detailed venue card that appears in the venue list area
-        const venueList = document.getElementById('venueList');
-        
-        const venueDetailsHTML = `
-            <div class="venue-details-card">
-                <div class="venue-details-header">
-                    <h4>${venue.name}</h4>
-                    <button class="close-details" onclick="app.hideVenueDetails()">×</button>
-                </div>
-                <div class="venue-details-content">
-                    <div class="detail-row">
-                        <strong>Address:</strong> ${venue.fullAddress}
-                    </div>
-                    <div class="detail-row">
-                        <strong>Type:</strong> 
-                        <span class="venue-tag ${venue.type.toLowerCase()}">${venue.type}</span>
-                    </div>
-                    ${venue.county ? `
-                    <div class="detail-row">
-                        <strong>County:</strong> 
-                        <span class="venue-tag county">${venue.county}</span>
-                    </div>
-                    ` : ''}
-                    ${venue.accountManager ? `
-                    <div class="detail-row">
-                        <strong>Account Manager:</strong> ${venue.accountManager}
-                    </div>
-                    ` : ''}
-                    ${venue.phone ? `
-                    <div class="detail-row">
-                        <strong>Phone:</strong> ${venue.phone}
-                    </div>
-                    ` : ''}
-                    ${venue.accountManagerEmail ? `
-                    <div class="detail-row">
-                        <strong>Email:</strong> 
-                        <a href="mailto:${venue.accountManagerEmail}">${venue.accountManagerEmail}</a>
-                    </div>
-                    ` : ''}
-                </div>
-            </div>
-        `;
-        
-        venueList.innerHTML = venueDetailsHTML;
-        
-        // Update sidebar title to show venue name
-        const sidebarTitle = document.querySelector('.sidebar h3');
-        sidebarTitle.textContent = venue.name;
-    }
 
-    hideVenueDetails() {
-        // Refresh the venue list to show the normal list again
-        this.updateVenueList();
-        // Restore the appropriate title based on current filters
-        this.updateSidebarTitle();
-    }
 
     showError(message) {
-        const venueList = document.getElementById('venueList');
-        venueList.innerHTML = `<div class="error">${message}</div>`;
+        console.error(message);
+        alert(message);
     }
 }
 
